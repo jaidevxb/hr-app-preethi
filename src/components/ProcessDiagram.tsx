@@ -37,7 +37,7 @@ const NODES: DiagramNode[] = [
     y: 282,
     w: 36,
     h: 36,
-    label: { x: 388, y: 296, w: 90, lines: ["3-day SLA"] },
+    label: { x: 345, y: 393, w: 90, lines: ["3-day SLA"] },
   },
   {
     id: "escalatedReview",
@@ -55,7 +55,7 @@ const NODES: DiagramNode[] = [
     y: 235,
     w: 50,
     h: 50,
-    label: { x: 490, y: 200, w: 70, lines: ["Approved?"] },
+    label: { x: 490, y: 222, w: 70, lines: ["Approved?"] },
   },
   {
     id: "hrProcessing",
