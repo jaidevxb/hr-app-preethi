@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                   xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+                   xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+                   xmlns:di="http://www.omg.org/spec/DD/20100524/DI"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   id="Definitions_LeaveRequest"
+                   targetNamespace="https://leave-request-workflow.example/bpmn">
+
+  <bpmn:process id="Process_LeaveRequest" name="Leave Request Approval" isExecutable="false">
+
+    <bpmn:startEvent id="start" name="Request Submitted">
+      <bpmn:outgoing>flow_start_managerReview</bpmn:outgoing>
+    </bpmn:startEvent>
+
+    <bpmn:userTask id="managerReview" name="Manager Review">
+      <bpmn:incoming>flow_start_managerReview</bpmn:incoming>
+      <bpmn:outgoing>flow_managerReview_gateway</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:boundaryEvent id="managerReviewTimer" name="3-day SLA" attachedToRef="managerReview" cancelActivity="true">
+      <bpmn:outgoing>flow_timer_escalatedReview</bpmn:outgoing>
+      <bpmn:timerEventDefinition id="TimerEventDefinition_1">
+        <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">P3D</bpmn:timeDuration>
+      </bpmn:timerEventDefinition>
+    </bpmn:boundaryEvent>
+
+    <bpmn:userTask id="escalatedReview" name="Escalated Review (Skip-Level)">
+      <bpmn:incoming>flow_timer_escalatedReview</bpmn:incoming>
+      <bpmn:outgoing>flow_escalatedReview_gateway</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:exclusiveGateway id="approvalGateway" name="Approved?">
+      <bpmn:incoming>flow_managerReview_gateway</bpmn:incoming>
+      <bpmn:incoming>flow_escalatedReview_gateway</bpmn:incoming>
+      <bpmn:outgoing>flow_gateway_hrProcessing</bpmn:outgoing>
+      <bpmn:outgoing>flow_gateway_endRejected</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+
+    <bpmn:userTask id="hrProcessing" name="HR Processes Leave">
+      <bpmn:incoming>flow_gateway_hrProcessing</bpmn:incoming>
+      <bpmn:outgoing>flow_hrProcessing_endApproved</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:endEvent id="endApproved" name="Leave Approved">
+      <bpmn:incoming>flow_hrProcessing_endApproved</bpmn:incoming>
+    </bpmn:endEvent>
+
+    <bpmn:endEvent id="endRejected" name="Leave Rejected">
+      <bpmn:incoming>flow_gateway_endRejected</bpmn:incoming>
+    </bpmn:endEvent>
+
+    <bpmn:sequenceFlow id="flow_start_managerReview" sourceRef="start" targetRef="managerReview" />
+    <bpmn:sequenceFlow id="flow_managerReview_gateway" sourceRef="managerReview" targetRef="approvalGateway" />
+    <bpmn:sequenceFlow id="flow_timer_escalatedReview" sourceRef="managerReviewTimer" targetRef="escalatedReview" />
+    <bpmn:sequenceFlow id="flow_escalatedReview_gateway" sourceRef="escalatedReview" targetRef="approvalGateway" />
+    <bpmn:sequenceFlow id="flow_gateway_hrProcessing" name="Approved" sourceRef="approvalGateway" targetRef="hrProcessing">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">decision == "approved"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="flow_gateway_endRejected" name="Rejected" sourceRef="approvalGateway" targetRef="endRejected">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">decision == "rejected"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="flow_hrProcessing_endApproved" sourceRef="hrProcessing" targetRef="endApproved" />
+
+  </bpmn:process>
+
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="Process_LeaveRequest">
+
+      <bpmndi:BPMNShape id="start_di" bpmnElement="start">
+        <dc:Bounds x="140" y="222" width="36" height="36" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="managerReview_di" bpmnElement="managerReview">
+        <dc:Bounds x="260" y="200" width="110" height="80" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="managerReviewTimer_di" bpmnElement="managerReviewTimer">
+        <dc:Bounds x="297" y="262" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="345" y="273" width="80" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="escalatedReview_di" bpmnElement="escalatedReview">
+        <dc:Bounds x="260" y="420" width="110" height="80" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="approvalGateway_di" bpmnElement="approvalGateway" isMarkerVisible="true">
+        <dc:Bounds x="460" y="215" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="450" y="190" width="70" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="hrProcessing_di" bpmnElement="hrProcessing">
+        <dc:Bounds x="610" y="200" width="110" height="80" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="endApproved_di" bpmnElement="endApproved">
+        <dc:Bounds x="800" y="222" width="36" height="36" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="endRejected_di" bpmnElement="endRejected">
+        <dc:Bounds x="467" y="442" width="36" height="36" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNEdge id="flow_start_managerReview_di" bpmnElement="flow_start_managerReview">
+        <di:waypoint x="176" y="240" />
+        <di:waypoint x="260" y="240" />
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="flow_managerReview_gateway_di" bpmnElement="flow_managerReview_gateway">
+        <di:waypoint x="370" y="240" />
+        <di:waypoint x="460" y="240" />
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="flow_timer_escalatedReview_di" bpmnElement="flow_timer_escalatedReview">
+        <di:waypoint x="315" y="298" />
+        <di:waypoint x="315" y="420" />
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="flow_escalatedReview_gateway_di" bpmnElement="flow_escalatedReview_gateway">
+        <di:waypoint x="370" y="460" />
+        <di:waypoint x="460" y="460" />
+        <di:waypoint x="460" y="240" />
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="flow_gateway_hrProcessing_di" bpmnElement="flow_gateway_hrProcessing">
+        <di:waypoint x="510" y="240" />
+        <di:waypoint x="610" y="240" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="540" y="220" width="60" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="flow_gateway_endRejected_di" bpmnElement="flow_gateway_endRejected">
+        <di:waypoint x="485" y="265" />
+        <di:waypoint x="485" y="442" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="495" y="346" width="54" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="flow_hrProcessing_endApproved_di" bpmnElement="flow_hrProcessing_endApproved">
+        <di:waypoint x="720" y="240" />
+        <di:waypoint x="800" y="240" />
+      </bpmndi:BPMNEdge>
+
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+
+</bpmn:definitions>

@@ -1,7 +1,7 @@
 import { ActionPanel } from "../components/ActionPanel.js";
 import { LogTimeline } from "../components/LogTimeline.js";
+import { ProcessDiagram } from "../components/ProcessDiagram.js";
 import { RequestForm } from "../components/RequestForm.js";
-import { Stepper } from "../components/Stepper.js";
 import { useWorkflowInstance } from "../hooks/useWorkflowInstance.js";
 import { leaveRequestWorkflow } from "../workflow/leaveRequestWorkflow.js";
 
@@ -14,7 +14,7 @@ export function WorkflowPage() {
 
   return (
     <div className="page">
-      <Stepper definition={leaveRequestWorkflow} instance={instance} />
+      <ProcessDiagram instance={instance} />
 
       {!instance && <RequestForm onSubmit={submit} />}
 

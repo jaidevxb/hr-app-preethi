@@ -391,123 +391,81 @@ form > .btn-block {
   margin-bottom: 0.9rem;
 }
 
-/* Stepper */
+/* Process diagram (bpmn-js) */
 .stepper-card {
   padding: 1.85rem 0.75rem 1.25rem;
 }
 
 .stepper-header {
   padding: 0 0.75rem;
-  margin-bottom: 0.35rem;
+  margin-bottom: 0.9rem;
 }
 
 .stepper-subtitle {
   margin: 0;
 }
 
-.stepper {
-  display: flex;
-  overflow-x: auto;
-  padding: 0.75rem 0.25rem 0.75rem;
-  -webkit-mask-image: linear-gradient(to right, transparent 0, black 16px, black calc(100% - 16px), transparent 100%);
-  mask-image: linear-gradient(to right, transparent 0, black 16px, black calc(100% - 16px), transparent 100%);
+.bpmn-frame {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--field-bg);
 }
 
-.step {
-  flex: 1 0 100px;
-  min-width: 100px;
-  text-align: center;
-  position: relative;
-  padding-top: 0.25rem;
-}
-
-.step:not(:first-child)::before {
-  content: "";
-  position: absolute;
-  top: calc(0.25rem + 19px);
-  left: -50%;
+.bpmn-canvas {
   width: 100%;
-  height: 2px;
-  background: var(--border);
+  height: 320px;
+  background: var(--field-bg);
 }
 
-.step-node {
-  position: relative;
-  z-index: 1;
-  width: 38px;
-  height: 38px;
-  margin: 0 auto;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1rem;
-  background: var(--surface);
-  border: 2px solid var(--border);
-  color: var(--muted);
+/* bpmn-js paints every element via inline style attributes, which beat
+   plain CSS specificity — !important is required to retheme it. The main
+   shape (rect/circle/polygon) is always djs-visual's first child; icon
+   glyphs (person, clock hands, gateway X) are later siblings and are left
+   alone so their two-tone rendering still reads correctly. */
+.bpmn-canvas .djs-visual > :first-child:not(text) {
+  fill: var(--field-bg) !important;
+  stroke: var(--text) !important;
+  stroke-width: 1.5px !important;
 }
 
-.step-node--startEvent,
-.step-node--endEvent {
-  border-radius: 50%;
+/* The gateway's "X" marker glyph is a second, separately-filled path
+   (not the diamond itself) — without this it renders near-black and
+   disappears against the now-dark diamond fill. */
+.bpmn-canvas [data-element-id="approvalGateway"] .djs-visual > :last-child {
+  fill: var(--text) !important;
 }
 
-.step-node--userTask {
-  border-radius: 9px;
+.bpmn-canvas text {
+  fill: var(--text) !important;
 }
 
-.step-node--exclusiveGateway {
-  border-radius: 6px;
-  transform: rotate(45deg);
+.bpmn-canvas .djs-connection .djs-visual path {
+  stroke: var(--muted) !important;
 }
 
-.step-node--exclusiveGateway span {
-  transform: rotate(-45deg);
-  display: inline-block;
+.bpmn-canvas marker path {
+  fill: var(--muted) !important;
+  stroke: var(--muted) !important;
 }
 
-.step-node.is-pending {
-  border-style: dashed;
-  opacity: 0.55;
+.bpmn-canvas .bjs-powered-by {
+  fill: var(--muted) !important;
+  opacity: 0.7;
 }
 
-.step-node.is-done {
-  border-color: var(--accent);
-  color: var(--accent);
+.bpmn-canvas .bpmn-visited .djs-visual > :first-child {
+  stroke: var(--accent) !important;
 }
 
-.step-node.is-current {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--accent-contrast);
-  box-shadow: 0 0 0 4px var(--accent-soft);
+.bpmn-canvas .bpmn-visited text {
+  fill: var(--accent) !important;
 }
 
-.step-label {
-  margin-top: 0.6rem;
-  font-size: 0.78rem;
-  font-weight: 500;
-}
-
-.step-meta {
-  font-size: 0.68rem;
-  color: var(--muted);
-  margin-top: 0.15rem;
-}
-
-.step-meta--timer {
-  color: var(--accent);
-}
-
-.legend {
-  display: flex;
-  gap: 1.25rem;
-  flex-wrap: wrap;
-  justify-content: center;
-  padding-top: 0.75rem;
-  margin-top: 0.5rem;
-  border-top: 1px solid var(--border);
-  font-size: 0.72rem;
-  color: var(--muted);
+.bpmn-canvas .bpmn-current .djs-visual > :first-child {
+  stroke: var(--accent) !important;
+  stroke-width: 3px !important;
+  fill: var(--accent-soft) !important;
 }
 
 /* Outcome banner */
@@ -730,32 +688,14 @@ th {
     width: 100%;
   }
 
-  .step {
-    flex-basis: 88px;
-    min-width: 88px;
-  }
-
-  .step-label {
-    font-size: 0.72rem;
-  }
-
-  .legend {
-    gap: 0.7rem 1rem;
+  .bpmn-canvas {
+    height: 260px;
   }
 }
 
 @media (max-width: 400px) {
   .stepper-card {
     padding: 1.5rem 0.5rem 1rem;
-  }
-
-  .step {
-    flex-basis: 78px;
-    min-width: 78px;
-  }
-
-  .step-meta {
-    display: none;
   }
 
   main {
