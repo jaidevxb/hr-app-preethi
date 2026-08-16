@@ -1,0 +1,82 @@
+import { createInterface } from "node:readline";
+import { WorkflowInstance } from "./workflow/engine.js";
+import { leaveRequestWorkflow } from "./workflow/leaveRequestWorkflow.js";
+
+const rl = createInterface({ input: process.stdin, output: process.stdout });
+const lines = rl[Symbol.asyncIterator]();
+
+async function ask(promptText: string): Promise<string> {
+  process.stdout.write(promptText);
+  const { value, done } = await lines.next();
+  return done ? "" : value;
+}
+
+function printLog(instance: WorkflowInstance) {
+  console.log("\n--- Workflow log ---");
+  for (const entry of instance.getLog()) {
+    console.log(`[${entry.nodeName}] ${entry.message}`);
+  }
+  console.log("--------------------\n");
+}
+
+async function main() {
+  console.log("=== Leave Request Approval (BPMN demo) ===\n");
+
+  const employeeName = (await ask("Employee name: ")) || "Employee";
+  const days = (await ask("Number of days: ")) || "1";
+  const reason = (await ask("Reason: ")) || "Personal";
+
+  const instance = new WorkflowInstance(leaveRequestWorkflow, {
+    employeeName,
+    days,
+    reason,
+  });
+  instance.start();
+
+  while (instance.getStatus() === "waitingOnTask") {
+    const node = instance.getCurrentNode();
+    if (node.type !== "userTask") break; // not reachable, but keeps TS happy
+
+    console.log(`\n>> Current task: "${node.name}" (assignee: ${node.assignee})`);
+
+    if (node.id === "managerReview" || node.id === "escalatedReview") {
+      const hasTimer = !!node.timer;
+      const prompt = hasTimer
+        ? "Decision — [a]pprove / [r]eject / [t]imer expires (escalate): "
+        : "Decision — [a]pprove / [r]eject: ";
+      const answer = ((await ask(prompt)) || "").trim().toLowerCase();
+
+      if (hasTimer && answer.startsWith("t")) {
+        instance.fireTimer();
+        continue;
+      }
+      const decision = answer.startsWith("a") ? "approved" : "rejected";
+      instance.completeTask({ decision });
+      continue;
+    }
+
+    if (node.id === "hrProcessing") {
+      await ask("Press Enter once HR has processed the leave...");
+      instance.completeTask({});
+      continue;
+    }
+
+    // Fallback for any future user tasks: just complete with no data.
+    await ask(`Press Enter to complete "${node.name}"...`);
+    instance.completeTask({});
+  }
+
+  printLog(instance);
+  const outcome = instance.getContext();
+  console.log(`Final status: ${instance.getStatus()}`);
+  console.log(`Employee: ${employeeName}, Days: ${days}, Decision path recorded above.`);
+  console.log(JSON.stringify(outcome, null, 2));
+
+  rl.close();
+}
+
+main().catch((err) => {
+  console.error(err);
+  rl.close();
+  process.exit(1);
+});
