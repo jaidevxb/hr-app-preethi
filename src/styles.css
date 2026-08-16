@@ -391,13 +391,13 @@ form > .btn-block {
   margin-bottom: 0.9rem;
 }
 
-/* Process diagram (bpmn-js) */
+/* Process diagram (custom SVG) */
 .stepper-card {
-  padding: 1.85rem 0.75rem 1.25rem;
+  padding: 1.85rem 1.25rem 1.5rem;
 }
 
 .stepper-header {
-  padding: 0 0.75rem;
+  padding: 0 0.25rem;
   margin-bottom: 0.9rem;
 }
 
@@ -405,67 +405,123 @@ form > .btn-block {
   margin: 0;
 }
 
-.bpmn-frame {
+.diagram-frame {
   border: 1px solid var(--border);
   border-radius: 10px;
-  overflow: hidden;
   background: var(--field-bg);
+  padding: 0.5rem;
 }
 
-.bpmn-canvas {
+.diagram-svg {
+  display: block;
   width: 100%;
-  height: 320px;
-  background: var(--field-bg);
+  height: auto;
+  max-height: 380px;
 }
 
-/* bpmn-js paints every element via inline style attributes, which beat
-   plain CSS specificity — !important is required to retheme it. The main
-   shape (rect/circle/polygon) is always djs-visual's first child; icon
-   glyphs (person, clock hands, gateway X) are later siblings and are left
-   alone so their two-tone rendering still reads correctly. */
-.bpmn-canvas .djs-visual > :first-child:not(text) {
-  fill: var(--field-bg) !important;
-  stroke: var(--text) !important;
-  stroke-width: 1.5px !important;
+@media (max-width: 640px) {
+  .diagram-frame {
+    overflow-x: auto;
+    -webkit-mask-image: linear-gradient(to right, black calc(100% - 20px), transparent 100%);
+    mask-image: linear-gradient(to right, black calc(100% - 20px), transparent 100%);
+  }
+
+  /* Below this width, scaling to fit the container shrinks the label text
+     past legibility — fix a render width instead and let it scroll. */
+  .diagram-svg {
+    width: 700px;
+    max-height: none;
+  }
 }
 
-/* The gateway's "X" marker glyph is a second, separately-filled path
-   (not the diamond itself) — without this it renders near-black and
-   disappears against the now-dark diamond fill. */
-.bpmn-canvas [data-element-id="approvalGateway"] .djs-visual > :last-child {
-  fill: var(--text) !important;
+.diagram-shape {
+  fill: none;
+  stroke: var(--text);
+  stroke-width: 1.5;
+  transition: stroke 0.2s ease, fill 0.2s ease;
 }
 
-.bpmn-canvas text {
-  fill: var(--text) !important;
+.diagram-shape--start {
+  stroke-width: 1.5;
 }
 
-.bpmn-canvas .djs-connection .djs-visual path {
-  stroke: var(--muted) !important;
+.diagram-shape--end {
+  stroke-width: 2.5;
 }
 
-.bpmn-canvas marker path {
-  fill: var(--muted) !important;
-  stroke: var(--muted) !important;
+.diagram-shape--boundary {
+  stroke-width: 1.5;
+  stroke-dasharray: 3 2.5;
 }
 
-.bpmn-canvas .bjs-powered-by {
-  fill: var(--muted) !important;
-  opacity: 0.7;
+.diagram-glyph {
+  fill: none;
+  stroke: var(--text);
+  stroke-width: 1.2;
+  stroke-linecap: round;
+  transition: stroke 0.2s ease;
 }
 
-.bpmn-canvas .bpmn-visited .djs-visual > :first-child {
-  stroke: var(--accent) !important;
+.diagram-glyph--bold {
+  stroke-width: 1.6;
 }
 
-.bpmn-canvas .bpmn-visited text {
-  fill: var(--accent) !important;
+.diagram-label {
+  fill: var(--text);
+  font-family: var(--font);
+  font-size: 11.5px;
+  font-weight: 600;
 }
 
-.bpmn-canvas .bpmn-current .djs-visual > :first-child {
-  stroke: var(--accent) !important;
-  stroke-width: 3px !important;
-  fill: var(--accent-soft) !important;
+.diagram-edge path {
+  fill: none;
+  stroke: var(--muted);
+  stroke-width: 1.4;
+}
+
+.diagram-edge-label {
+  fill: var(--muted);
+  font-family: var(--font);
+  font-size: 10.5px;
+  font-weight: 600;
+}
+
+.diagram-arrowhead {
+  fill: var(--muted);
+}
+
+.diagram-node--visited .diagram-shape,
+.diagram-node--visited .diagram-glyph {
+  stroke: var(--accent);
+}
+
+.diagram-node--visited .diagram-label {
+  fill: var(--accent);
+}
+
+.diagram-node--current .diagram-shape,
+.diagram-node--current .diagram-glyph {
+  stroke: var(--accent);
+  stroke-width: 2.25;
+}
+
+.diagram-node--current .diagram-shape {
+  fill: var(--accent-soft);
+  animation: diagram-pulse 2.2s ease-in-out infinite;
+}
+
+.diagram-node--current .diagram-label {
+  fill: var(--accent);
+}
+
+@keyframes diagram-pulse {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 0 transparent);
+  }
+  50% {
+    filter: drop-shadow(0 0 5px var(--accent));
+  }
 }
 
 /* Outcome banner */
@@ -686,10 +742,6 @@ th {
 
   .btn-row .btn {
     width: 100%;
-  }
-
-  .bpmn-canvas {
-    height: 260px;
   }
 }
 

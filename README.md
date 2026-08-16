@@ -1,10 +1,12 @@
 # HR Workflow — Leave Request (BPMN, v1)
 
 A hand-rolled workflow engine modeling a Leave Request Approval process,
-rendered as a real BPMN 2.0 diagram via `bpmn-js` (the library behind
-bpmn.io / Camunda Modeler). Two front ends sit on top of the same engine: an
-interactive CLI and a React/Vite web UI with a full in-app Docs page —
-what/why/roadmap.
+backed by a real BPMN 2.0 XML process definition and visualized with a
+custom-drawn SVG diagram (bpmn-js's default renderer paints via inline
+styles built for a white canvas and wasn't worth fighting to retheme — see
+the in-app Docs page for the full story). Two front ends sit on top of the
+same engine: an interactive CLI and a React/Vite web UI with a full in-app
+Docs page — what/why/roadmap.
 
 ## Flow
 
@@ -41,10 +43,10 @@ npm run typecheck  # type-check the CLI/engine side (tsc, no emit)
 - `src/workflow/types.ts` — generic BPMN-ish node/definition types
 - `src/workflow/engine.ts` — reusable `WorkflowInstance` engine (start, completeTask, fireTimer)
 - `src/workflow/leaveRequestWorkflow.ts` — the actual leave-request process definition
-- `src/workflow/leaveRequestWorkflow.bpmn` — the same process as real BPMN 2.0 XML
+- `src/workflow/leaveRequestWorkflow.bpmn` — the same process as real BPMN 2.0 XML (reference artifact, openable in Camunda Modeler/bpmn.io — not parsed by the app)
 - `src/cli.ts` — interactive terminal driver
 - `src/hooks/useWorkflowInstance.ts` — React wrapper around the engine
-- `src/components/BpmnDiagram.tsx` — bpmn-js viewer wrapper, highlights live progress
+- `src/components/ProcessDiagram.tsx` — custom SVG diagram, highlights live progress
 - `src/components/`, `src/pages/` — the web UI (diagram + forms + Docs page)
 
 The Docs page (in-app, at the "Docs" tab) covers what BPMN is, why this

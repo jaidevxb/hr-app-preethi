@@ -68,83 +68,92 @@
     <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="Process_LeaveRequest">
 
       <bpmndi:BPMNShape id="start_di" bpmnElement="start">
-        <dc:Bounds x="140" y="222" width="36" height="36" />
+        <dc:Bounds x="140" y="242" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="115" y="294" width="86" height="27" />
+        </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
 
       <bpmndi:BPMNShape id="managerReview_di" bpmnElement="managerReview">
-        <dc:Bounds x="260" y="200" width="110" height="80" />
+        <dc:Bounds x="270" y="220" width="120" height="80" />
       </bpmndi:BPMNShape>
 
       <bpmndi:BPMNShape id="managerReviewTimer_di" bpmnElement="managerReviewTimer">
-        <dc:Bounds x="297" y="262" width="36" height="36" />
+        <dc:Bounds x="312" y="282" width="36" height="36" />
         <bpmndi:BPMNLabel>
-          <dc:Bounds x="345" y="273" width="80" height="14" />
+          <dc:Bounds x="374" y="292" width="80" height="14" />
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
 
       <bpmndi:BPMNShape id="escalatedReview_di" bpmnElement="escalatedReview">
-        <dc:Bounds x="260" y="420" width="110" height="80" />
+        <dc:Bounds x="270" y="460" width="120" height="80" />
       </bpmndi:BPMNShape>
 
       <bpmndi:BPMNShape id="approvalGateway_di" bpmnElement="approvalGateway" isMarkerVisible="true">
-        <dc:Bounds x="460" y="215" width="50" height="50" />
+        <dc:Bounds x="500" y="235" width="50" height="50" />
         <bpmndi:BPMNLabel>
-          <dc:Bounds x="450" y="190" width="70" height="14" />
+          <dc:Bounds x="490" y="206" width="70" height="14" />
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
 
       <bpmndi:BPMNShape id="hrProcessing_di" bpmnElement="hrProcessing">
-        <dc:Bounds x="610" y="200" width="110" height="80" />
+        <dc:Bounds x="660" y="220" width="120" height="80" />
       </bpmndi:BPMNShape>
 
       <bpmndi:BPMNShape id="endApproved_di" bpmnElement="endApproved">
-        <dc:Bounds x="800" y="222" width="36" height="36" />
+        <dc:Bounds x="862" y="242" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="827" y="294" width="106" height="14" />
+        </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
 
       <bpmndi:BPMNShape id="endRejected_di" bpmnElement="endRejected">
-        <dc:Bounds x="467" y="442" width="36" height="36" />
+        <dc:Bounds x="507" y="500" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="472" y="552" width="106" height="14" />
+        </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
 
       <bpmndi:BPMNEdge id="flow_start_managerReview_di" bpmnElement="flow_start_managerReview">
-        <di:waypoint x="176" y="240" />
-        <di:waypoint x="260" y="240" />
+        <di:waypoint x="176" y="260" />
+        <di:waypoint x="270" y="260" />
       </bpmndi:BPMNEdge>
 
       <bpmndi:BPMNEdge id="flow_managerReview_gateway_di" bpmnElement="flow_managerReview_gateway">
-        <di:waypoint x="370" y="240" />
-        <di:waypoint x="460" y="240" />
+        <di:waypoint x="390" y="260" />
+        <di:waypoint x="500" y="260" />
       </bpmndi:BPMNEdge>
 
       <bpmndi:BPMNEdge id="flow_timer_escalatedReview_di" bpmnElement="flow_timer_escalatedReview">
-        <di:waypoint x="315" y="298" />
-        <di:waypoint x="315" y="420" />
+        <di:waypoint x="330" y="318" />
+        <di:waypoint x="330" y="460" />
       </bpmndi:BPMNEdge>
 
       <bpmndi:BPMNEdge id="flow_escalatedReview_gateway_di" bpmnElement="flow_escalatedReview_gateway">
-        <di:waypoint x="370" y="460" />
-        <di:waypoint x="460" y="460" />
-        <di:waypoint x="460" y="240" />
+        <di:waypoint x="390" y="500" />
+        <di:waypoint x="500" y="500" />
+        <di:waypoint x="500" y="260" />
       </bpmndi:BPMNEdge>
 
       <bpmndi:BPMNEdge id="flow_gateway_hrProcessing_di" bpmnElement="flow_gateway_hrProcessing">
-        <di:waypoint x="510" y="240" />
-        <di:waypoint x="610" y="240" />
+        <di:waypoint x="550" y="260" />
+        <di:waypoint x="660" y="260" />
         <bpmndi:BPMNLabel>
-          <dc:Bounds x="540" y="220" width="60" height="14" />
+          <dc:Bounds x="583" y="236" width="54" height="14" />
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNEdge>
 
       <bpmndi:BPMNEdge id="flow_gateway_endRejected_di" bpmnElement="flow_gateway_endRejected">
-        <di:waypoint x="485" y="265" />
-        <di:waypoint x="485" y="442" />
+        <di:waypoint x="525" y="285" />
+        <di:waypoint x="525" y="500" />
         <bpmndi:BPMNLabel>
-          <dc:Bounds x="495" y="346" width="54" height="14" />
+          <dc:Bounds x="537" y="390" width="52" height="14" />
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNEdge>
 
       <bpmndi:BPMNEdge id="flow_hrProcessing_endApproved_di" bpmnElement="flow_hrProcessing_endApproved">
-        <di:waypoint x="720" y="240" />
-        <di:waypoint x="800" y="240" />
+        <di:waypoint x="780" y="260" />
+        <di:waypoint x="862" y="260" />
       </bpmndi:BPMNEdge>
 
     </bpmndi:BPMNPlane>

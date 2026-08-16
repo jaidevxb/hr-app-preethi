@@ -34,9 +34,14 @@ const GLOSSARY = [
 
 const SHIPPED = [
   {
-    title: "Real diagram rendering with bpmn-js",
+    title: "A real BPMN 2.0 process definition",
     detail:
-      "The hand-built stepper is gone — this is now an actual BPMN 2.0 XML file, rendered by bpmn-js (the library behind bpmn.io / Camunda Modeler), with live highlighting as the workflow progresses.",
+      "leaveRequestWorkflow.bpmn is genuine BPMN 2.0 XML — open it in Camunda Modeler or bpmn.io and it renders with their standard tooling, same as any process a real team would author.",
+  },
+  {
+    title: "A custom-drawn diagram, not the stock renderer",
+    detail:
+      "The in-app diagram (this one) is hand-rendered SVG instead of bpmn-js's default output — bpmn-js paints everything via inline styles built for a white canvas, which fought every attempt to retheme it into this app's dark/light palette. Same shapes, positions, and semantics as the .bpmn file; full control over the visuals.",
   },
 ];
 
@@ -44,7 +49,7 @@ const ROADMAP = [
   {
     title: "Diagram authoring, not just viewing",
     detail:
-      "Currently a read-only Viewer. Swapping in bpmn-js's Modeler would let you drag out new tasks/gateways and export the edited XML, turning this into an actual diagram editor.",
+      "The diagram here is read-only. A real editing surface (drag out new tasks/gateways, export the edited XML) would mean bringing in bpmn-js's Modeler after all — just for authoring, not for display.",
   },
   {
     title: "Real timers + persistence",
@@ -78,8 +83,9 @@ export function DocsPage() {
         <p>
           A small, self-contained demo that models a real HR process — leave/time-off approval — as a{" "}
           <strong>BPMN 2.0 workflow</strong>. The CLI and this visual UI are two different front ends sitting on top
-          of the exact same workflow engine; the diagram itself is rendered by bpmn-js, the real library behind
-          bpmn.io and Camunda Modeler.
+          of the exact same workflow engine; the process is also written out as real BPMN 2.0 XML, openable in
+          Camunda Modeler or bpmn.io, though the diagram below is a custom-rendered view of it (see "Shipped" for
+          why).
         </p>
       </section>
 
@@ -156,15 +162,15 @@ export function DocsPage() {
             and the engine)
           </li>
           <li>
-            <code>src/workflow/leaveRequestWorkflow.bpmn</code> — the same process as real BPMN 2.0 XML, rendered by{" "}
-            <code>bpmn-js</code>
+            <code>src/workflow/leaveRequestWorkflow.bpmn</code> — the same process as real BPMN 2.0 XML (a reference
+            artifact — not parsed by the app)
           </li>
           <li>
             <code>src/cli.ts</code> — terminal driver
           </li>
           <li>
-            <code>src/components/BpmnDiagram.tsx</code> — bpmn-js wrapper; highlights visited/current nodes as the
-            engine progresses
+            <code>src/components/ProcessDiagram.tsx</code> — custom SVG diagram; highlights visited/current nodes as
+            the engine progresses
           </li>
           <li>
             <code>src/hooks</code>, <code>src/components</code>, <code>src/pages</code> — this browser UI, reusing
@@ -179,7 +185,7 @@ export function DocsPage() {
           <li>One workflow definition: Leave Request</li>
           <li>One in-memory instance at a time — nothing persists across a page refresh or a new CLI run</li>
           <li>The 3-day SLA timer is simulated with a button, not a real clock</li>
-          <li>The diagram is read-only (a Viewer) — you can't drag out new elements or edit it yet</li>
+          <li>The diagram is read-only and hand-drawn for this one process — not a general-purpose renderer</li>
           <li>No auth, no multi-user, no database, no notifications</li>
         </ul>
         <p className="muted">This is a learning/demo project, not production software — that's intentional.</p>
@@ -220,9 +226,9 @@ export function DocsPage() {
       <section className="card docs-section">
         <h2>Where this currently stops</h2>
         <p>
-          Right here: one process, playable end-to-end through both the CLI and this UI, rendered as a real BPMN 2.0
-          diagram, unit-tested, and documented. Nothing else on the roadmap above is built yet — each item gets
-          picked up only when it's actually needed next, not speculatively.
+          Right here: one process, playable end-to-end through both the CLI and this UI, backed by real BPMN 2.0 XML
+          and a custom-drawn diagram, unit-tested, and documented. Nothing else on the roadmap above is built yet —
+          each item gets picked up only when it's actually needed next, not speculatively.
         </p>
       </section>
     </div>
