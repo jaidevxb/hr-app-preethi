@@ -20,7 +20,6 @@ export function RequestForm({ onSubmit }: { onSubmit: (ctx: WorkflowContext) => 
     >
       <span className="eyebrow">New Request</span>
       <h2>Leave Request</h2>
-      <p className="muted">Kicks off the Start Event and routes straight to Manager Review.</p>
 
       <label>
         Employee name
@@ -35,8 +34,9 @@ export function RequestForm({ onSubmit }: { onSubmit: (ctx: WorkflowContext) => 
         <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Family trip" />
       </label>
 
-      <button type="submit" className="btn btn-primary">
-        Submit Request
+      <button type="submit" className="btn btn-primary btn-block">
+        <span>Submit Request</span>
+        <span aria-hidden>→</span>
       </button>
     </form>
   );

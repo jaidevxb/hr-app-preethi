@@ -1,6 +1,17 @@
 import type { WorkflowInstance } from "../workflow/engine.js";
 import type { WorkflowDefinition } from "../workflow/types.js";
 
+// Canonical happy-path + escalation order, for the empty-state preview
+// (before an instance exists there's no log to derive an order from).
+const PREVIEW_ORDER = [
+  "start",
+  "managerReview",
+  "escalatedReview",
+  "approvalGateway",
+  "hrProcessing",
+  "endApproved",
+];
+
 function visitedNodeIds(instance: WorkflowInstance): string[] {
   const seen = new Set<string>();
   const order: string[] = [];
@@ -25,18 +36,29 @@ export function Stepper({
   instance,
 }: {
   definition: WorkflowDefinition;
-  instance: WorkflowInstance;
+  instance: WorkflowInstance | null;
 }) {
-  const order = visitedNodeIds(instance);
-  const currentId = instance.getCurrentNode().id;
-  const isCompleted = instance.getStatus() === "completed";
+  const order = instance ? visitedNodeIds(instance) : PREVIEW_ORDER;
+  const currentId = instance?.getCurrentNode().id;
+  const isCompleted = instance?.getStatus() === "completed";
+
+  const subtitle = !instance
+    ? "Full flow, start to finish — highlights live once a request is submitted."
+    : isCompleted
+      ? "Completed — final path taken."
+      : "Live progress for this request.";
 
   return (
     <div className="card stepper-card">
+      <div className="stepper-header">
+        <span className="eyebrow">{instance ? "In Progress" : "Process Overview"}</span>
+        <p className="muted stepper-subtitle">{subtitle}</p>
+      </div>
       <div className="stepper">
         {order.map((id) => {
           const node = definition.nodes[id];
-          const isCurrent = id === currentId && !isCompleted;
+          const isCurrent = !!instance && id === currentId && !isCompleted;
+          const isPending = !instance;
           const hasTimer = node.type === "userTask" && !!node.timer;
           return (
             <div className="step" key={id}>
@@ -44,7 +66,7 @@ export function Stepper({
                 className={
                   "step-node" +
                   ` step-node--${node.type}` +
-                  (isCurrent ? " is-current" : " is-done")
+                  (isPending ? " is-pending" : isCurrent ? " is-current" : " is-done")
                 }
               >
                 <span aria-hidden>{ICON[node.type]}</span>
