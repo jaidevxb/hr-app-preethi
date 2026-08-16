@@ -28,10 +28,11 @@ instead of a real clock, since this is v1).
 
 ```bash
 npm install
-npm run dev      # web UI at http://localhost:5173 — Workflow tab + Docs tab
-npm run cli      # interactive terminal walkthrough of the same flow
-npm test         # unit tests covering approve / reject / timer-escalation paths
-npm run build:web  # production build of the web UI (dist/)
+npm run dev        # web UI at http://localhost:5173 — Workflow tab + Docs tab
+npm run cli        # interactive terminal walkthrough of the same flow
+npm test           # unit tests covering approve / reject / timer-escalation paths
+npm run build      # production build of the web UI (dist/) — what Vercel runs
+npm run typecheck  # type-check the CLI/engine side (tsc, no emit)
 ```
 
 ## Structure

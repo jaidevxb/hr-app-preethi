@@ -6,9 +6,9 @@
   "scripts": {
     "cli": "tsx src/cli.ts",
     "dev": "vite",
-    "build:web": "vite build",
+    "build": "vite build",
     "preview": "vite preview",
-    "build": "tsc -p .",
+    "typecheck": "tsc -p . --noEmit",
     "test": "vitest run"
   },
   "dependencies": {
