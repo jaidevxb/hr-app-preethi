@@ -88,6 +88,11 @@ const SHIPPED = [
       "A 3-day SLA isn't something you can wait out in a demo, so the timers count against a compressed clock — one simulated day per second or two, adjustable, pausable. Everything else about the timer is real: the engine arms it when a token parks on the task, the deadline is the P3D from the file, and it fires and escalates by itself while you watch the diagram. The manual “simulate timer expiry” button is still there for impatience.",
   },
   {
+    title: "Step-through replay",
+    detail:
+      "Any instance can be replayed from its log — play it through, scrub to a step, or walk it one entry at a time while the diagram highlights exactly the element that entry touched. With parallel branches the log interleaves two tokens, and stepping through it is the clearest way to see that they really did run at the same time.",
+  },
+  {
     title: "Validation that catches the deadlock before you hit it",
     detail:
       "The parser rejects files it cannot execute at all. The validator finds the ones it can run but shouldn't: unreachable elements, a process with no reachable end event, a task nobody is assigned, a service task pointing at a handler nobody wrote — and above all the classic BPMN mistake, an AND-join sitting downstream of an XOR-split, which waits for two branches when only one will ever arrive. The library ships a deliberately broken process so you can watch it happen: the validator predicts the hang, then the engine hangs exactly there.",
@@ -100,11 +105,6 @@ const SHIPPED = [
 ];
 
 const ROADMAP = [
-  {
-    title: "Replay and step-through",
-    detail:
-      "Scrub a finished instance step by step and watch the tokens travel the diagram. The log records which token did what and the BPMNDI waypoints are already parsed, so the pieces are in place.",
-  },
   {
     title: "More of the BPMN vocabulary",
     detail:

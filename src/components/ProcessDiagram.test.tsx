@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { WorkflowInstance } from "../workflow/engine.js";
 import { handlers } from "../workflow/handlers.js";
 import { leaveRequestProcess } from "../workflow/processes/index.js";
-import { WorkflowDiagram } from "./ProcessDiagram.js";
+import { ProcessDiagram, WorkflowDiagram } from "./ProcessDiagram.js";
 
 /**
  * The diagram is generated from parsed BPMNDI data, so a broken shape kind or
@@ -71,5 +71,48 @@ describe("WorkflowDiagram", () => {
     expect(svg).toContain("diagram-node diagram-node--visited");
     // Nothing on the rejected path has been touched.
     expect(svg).toContain("diagram-node diagram-node--pending");
+  });
+});
+
+describe("replay", () => {
+  /** An instance that ran all the way to "Leave Approved". */
+  function completed() {
+    const wf = new WorkflowInstance(leaveRequestProcess.definition, { days: "3" }, handlers);
+    wf.start();
+    wf.completeTask(wf.getActiveTasks()[0].tokenId, { decision: "approved" });
+    wf.completeTask(wf.getActiveTasks()[0].tokenId, {});
+    return wf;
+  }
+
+  const at = (wf: WorkflowInstance, replayIndex: number | null) =>
+    renderToStaticMarkup(
+      <ProcessDiagram process={leaveRequestProcess} instance={wf} replayIndex={replayIndex} />
+    );
+
+  it("highlights exactly the element each log entry touched", () => {
+    const wf = completed();
+
+    const first = at(wf, 0);
+    expect(first).toContain("Replaying");
+    // Step one is the start event and nothing else.
+    expect(first.match(/diagram-node diagram-node--current/g)).toHaveLength(1);
+    expect(first.match(/diagram-node diagram-node--visited/g)).toBeNull();
+  });
+
+  it("accumulates visited elements as the replay advances", () => {
+    const wf = completed();
+    const log = wf.getLog();
+
+    const countVisited = (index: number) =>
+      (at(wf, index).match(/diagram-node diagram-node--visited/g) ?? []).length;
+
+    expect(countVisited(log.length - 1)).toBeGreaterThan(countVisited(1));
+  });
+
+  it("falls back to live state when no replay index is given", () => {
+    const svg = at(completed(), null);
+    expect(svg).toContain("Completed — full path highlighted below.");
+    // Nothing is current once the instance is done.
+    expect(svg.match(/diagram-node diagram-node--current/g)).toBeNull();
   });
 });

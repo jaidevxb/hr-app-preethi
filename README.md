@@ -56,6 +56,10 @@ second or two, adjustable and pausable — so a 3-day SLA can actually be
 watched running out and escalating. The deadline itself is the `P3D` from the
 file; only the clock is sped up.
 
+Any instance can be **replayed** from its log: play it through, scrub to a
+step, or walk it one entry at a time while the diagram highlights the element
+that entry touched.
+
 ## Run it
 
 ```bash
@@ -89,10 +93,10 @@ full roadmap — that content isn't duplicated here.
 
 ## Next steps (not built yet)
 
-See the Roadmap section on the in-app Docs page. Short version: step-through
-replay of a finished instance, more BPMN element types (inclusive gateways,
-message events, sub-processes), and eventually diagram authoring plus a real
-BPMN engine (Camunda/Zeebe) behind the same interface.
+See the Roadmap section on the in-app Docs page. Short version: more BPMN
+element types (inclusive gateways, message events, sub-processes), and
+eventually diagram authoring plus a real BPMN engine (Camunda/Zeebe) behind
+the same interface.
 
 Explicit non-goals, since this is a simulator: auth, a database, a dashboard
 of concurrent instances, notifications.

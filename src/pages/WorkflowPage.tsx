@@ -3,6 +3,7 @@ import { ActionPanel } from "../components/ActionPanel.js";
 import { ClockPanel } from "../components/ClockPanel.js";
 import { LogTimeline } from "../components/LogTimeline.js";
 import { ProcessDiagram } from "../components/ProcessDiagram.js";
+import { ReplayPanel } from "../components/ReplayPanel.js";
 import { RequestForm } from "../components/RequestForm.js";
 import { ValidationPanel } from "../components/ValidationPanel.js";
 import { useWorkflowInstance } from "../hooks/useWorkflowInstance.js";
@@ -20,6 +21,8 @@ function contextEntries(context: Record<string, unknown>) {
 export function WorkflowPage() {
   const [processId, setProcessId] = useState(DEFAULT_PROCESS_ID);
   const [speedId, setSpeedId] = useState(DEFAULT_SPEED_ID);
+  const [replayIndex, setReplayIndex] = useState<number | null>(null);
+  const [replaying, setReplaying] = useState(false);
   const process = findProcess(processId);
   const { definition } = process;
 
@@ -46,6 +49,13 @@ export function WorkflowPage() {
     [definition]
   );
 
+  const log = instance?.getLog() ?? [];
+  const inReplay = replayIndex !== null;
+  const exitReplay = () => {
+    setReplayIndex(null);
+    setReplaying(false);
+  };
+
   // Tokens are live but none are actionable and nothing is counting down.
   const stuck =
     status === "waiting" &&
@@ -63,6 +73,7 @@ export function WorkflowPage() {
             value={processId}
             onChange={(event) => {
               setProcessId(event.target.value);
+              exitReplay();
               reset();
             }}
           >
@@ -79,11 +90,34 @@ export function WorkflowPage() {
         </p>
       </div>
 
-      <ProcessDiagram process={process} instance={instance} />
+      <ProcessDiagram process={process} instance={instance} replayIndex={replayIndex} />
+
+      {inReplay && (
+        <ReplayPanel
+          log={log}
+          index={replayIndex}
+          playing={replaying}
+          onIndexChange={setReplayIndex}
+          onPlayingChange={setReplaying}
+          onExit={exitReplay}
+        />
+      )}
+
+      {!inReplay && log.length > 1 && (
+        <button
+          className="btn btn-ghost btn-block"
+          onClick={() => {
+            setReplayIndex(0);
+            setReplaying(true);
+          }}
+        >
+          ▶ Replay this instance step by step
+        </button>
+      )}
 
       <ValidationPanel issues={issues} />
 
-      {stuck && (
+      {stuck && !inReplay && (
         <p className="muted parallel-note parallel-note--stuck">
           Deadlocked. Tokens are parked at a join that is still waiting on a branch which can never
           arrive — there is nothing left to click. This is the failure the validation panel above
@@ -95,14 +129,14 @@ export function WorkflowPage() {
         <RequestForm start={start} processName={definition.name} onSubmit={submit} />
       )}
 
-      {activeTasks.length > 1 && (
+      {activeTasks.length > 1 && !inReplay && (
         <p className="muted parallel-note">
           {activeTasks.length} tasks are waiting at the same time — the process split into parallel
           branches and won't finish until all of them are done.
         </p>
       )}
 
-      {instance && status === "waiting" && (
+      {instance && status === "waiting" && !inReplay && (
         <ClockPanel
           speedId={speedId}
           onSpeedChange={setSpeedId}
@@ -112,20 +146,21 @@ export function WorkflowPage() {
         />
       )}
 
-      {activeTasks.map(({ tokenId, node }) => (
-        <ActionPanel
-          key={tokenId}
-          node={node}
-          isDecision={definition.nodes[node.next]?.type === "exclusiveGateway"}
-          remainingMs={remainingFor(tokenId)}
-          onApprove={() => completeTask(tokenId, { decision: "approved" })}
-          onReject={() => completeTask(tokenId, { decision: "rejected" })}
-          onFireTimer={() => fireTimer(tokenId)}
-          onComplete={() => completeTask(tokenId, {})}
-        />
-      ))}
+      {!inReplay &&
+        activeTasks.map(({ tokenId, node }) => (
+          <ActionPanel
+            key={tokenId}
+            node={node}
+            isDecision={definition.nodes[node.next]?.type === "exclusiveGateway"}
+            remainingMs={remainingFor(tokenId)}
+            onApprove={() => completeTask(tokenId, { decision: "approved" })}
+            onReject={() => completeTask(tokenId, { decision: "rejected" })}
+            onFireTimer={() => fireTimer(tokenId)}
+            onComplete={() => completeTask(tokenId, {})}
+          />
+        ))}
 
-      {outcome && (
+      {outcome && !inReplay && (
         <div className={`card outcome outcome-${outcome.outcome}`}>
           <h2>{outcome.name}</h2>
           <dl className="context-dump">
@@ -136,7 +171,13 @@ export function WorkflowPage() {
               </div>
             ))}
           </dl>
-          <button className="btn btn-ghost" onClick={reset}>
+          <button
+            className="btn btn-ghost"
+            onClick={() => {
+              exitReplay();
+              reset();
+            }}
+          >
             Run it again
           </button>
         </div>

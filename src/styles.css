@@ -604,6 +604,49 @@ form > .btn-block {
   }
 }
 
+/* Replay */
+.replay-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.replay-counter {
+  font-size: 0.78rem;
+  font-family: var(--font-mono);
+}
+
+.replay-entry {
+  display: flex;
+  align-items: baseline;
+  gap: 0.55rem;
+  flex-wrap: wrap;
+  margin: 0.7rem 0 0.9rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--field-bg);
+  font-size: 0.85rem;
+}
+
+.replay-scrubber {
+  display: block;
+  width: 100%;
+  margin: 0 0 1rem;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.replay-controls {
+  flex-wrap: wrap;
+}
+
+.replay-controls .btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 /* Validation panel */
 .validation-header {
   display: flex;

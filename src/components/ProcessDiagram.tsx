@@ -190,28 +190,46 @@ export function WorkflowDiagram({
 export function ProcessDiagram({
   process,
   instance,
+  replayIndex = null,
 }: {
   process: BpmnProcess;
   instance: WorkflowInstance | null;
+  /** When set, show the state as of this log entry instead of right now. */
+  replayIndex?: number | null;
 }) {
   const isCompleted = instance?.getStatus() === "completed";
+  const log = instance?.getLog() ?? [];
+  const replaying = instance !== null && replayIndex !== null && log.length > 0;
 
-  const visitedIds = instance ? visitedNodeIds(instance) : [];
-  const activeIds = instance && !isCompleted ? instance.getActiveNodeIds() : [];
+  let visitedIds: string[] = [];
+  let activeIds: string[] = [];
+
+  if (replaying) {
+    const at = Math.min(replayIndex, log.length - 1);
+    visitedIds = log.slice(0, at + 1).map((entry) => entry.nodeId);
+    activeIds = [log[at].nodeId];
+  } else if (instance) {
+    visitedIds = visitedNodeIds(instance);
+    activeIds = isCompleted ? [] : instance.getActiveNodeIds();
+  }
 
   const parallelBranches = activeIds.length;
-  const subtitle = !instance
-    ? "The full process map — highlights appear once a request is submitted."
-    : isCompleted
-      ? "Completed — full path highlighted below."
-      : parallelBranches > 1
-        ? `Live progress — ${parallelBranches} branches running in parallel.`
-        : "Live progress for this request.";
+  const subtitle = replaying
+    ? "Replaying — the highlighted element is the one this log entry touched."
+    : !instance
+      ? "The full process map — highlights appear once a request is submitted."
+      : isCompleted
+        ? "Completed — full path highlighted below."
+        : parallelBranches > 1
+          ? `Live progress — ${parallelBranches} branches running in parallel.`
+          : "Live progress for this request.";
+
+  const eyebrow = replaying ? "Replay" : instance ? "In Progress" : "Process Overview";
 
   return (
     <div className="card stepper-card">
       <div className="stepper-header">
-        <span className="eyebrow">{instance ? "In Progress" : "Process Overview"}</span>
+        <span className="eyebrow">{eyebrow}</span>
         <p className="muted stepper-subtitle">{subtitle}</p>
       </div>
       <WorkflowDiagram process={process} visitedIds={visitedIds} activeIds={activeIds} />
