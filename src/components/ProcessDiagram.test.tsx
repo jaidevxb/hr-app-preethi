@@ -2,7 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { WorkflowInstance } from "../workflow/engine.js";
 import { handlers } from "../workflow/handlers.js";
-import { leaveRequestProcess } from "../workflow/leaveRequestWorkflow.js";
+import { leaveRequestProcess } from "../workflow/processes/index.js";
 import { WorkflowDiagram } from "./ProcessDiagram.js";
 
 /**

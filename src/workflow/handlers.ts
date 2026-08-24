@@ -9,6 +9,7 @@ import type { ServiceHandlers } from "./engine.js";
  */
 
 const ANNUAL_ALLOWANCE_DAYS = 18;
+const AUTO_APPROVE_LIMIT = 5000;
 
 export const handlers: ServiceHandlers = {
   "leave.updateBalance": (ctx) => {
@@ -18,6 +19,31 @@ export const handlers: ServiceHandlers = {
     return {
       context: { leaveBalance: after, daysDeducted: days },
       message: `Deducted ${days} day(s) — ${after} of ${ANNUAL_ALLOWANCE_DAYS} remaining`,
+    };
+  },
+
+  "expense.policyCheck": (ctx) => {
+    const amount = Number(ctx.amount) || 0;
+    const autoApprove = amount <= AUTO_APPROVE_LIMIT;
+    return {
+      context: { autoApprove },
+      message: autoApprove
+        ? `₹${amount} is within the ₹${AUTO_APPROVE_LIMIT} limit — no approval needed`
+        : `₹${amount} is over the ₹${AUTO_APPROVE_LIMIT} limit — routing to Finance`,
+    };
+  },
+
+  "expense.reimburse": (ctx) => ({
+    context: { reimbursedAt: "next payroll run" },
+    message: `Queued ₹${Number(ctx.amount) || 0} for the next payroll run`,
+  }),
+
+  "onboarding.createAccounts": (ctx) => {
+    const name = String(ctx.employeeName ?? "the new hire");
+    const handle = name.trim().split(/\s+/)[0].toLowerCase() || "newhire";
+    return {
+      context: { accountEmail: `${handle}@example.com` },
+      message: `Created email + SSO for ${handle}@example.com`,
     };
   },
 };

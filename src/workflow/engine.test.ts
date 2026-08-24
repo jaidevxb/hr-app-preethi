@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { WorkflowInstance } from "./engine.js";
 import { handlers } from "./handlers.js";
-import { leaveRequestWorkflow } from "./leaveRequestWorkflow.js";
+import { leaveRequestProcess } from "./processes/index.js";
+
+const leaveRequestWorkflow = leaveRequestProcess.definition;
 
 function newInstance(context: Record<string, unknown> = {}) {
   const wf = new WorkflowInstance(leaveRequestWorkflow, { days: "4", ...context }, handlers);

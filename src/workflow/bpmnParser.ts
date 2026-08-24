@@ -4,6 +4,7 @@ import type {
   BusinessRuleTaskNode,
   EndEventNode,
   ExclusiveGatewayNode,
+  FormField,
   NodeId,
   ParallelGatewayNode,
   ServiceTaskNode,
@@ -262,6 +263,7 @@ function readNodes(
       type: "startEvent",
       name: attr(raw, "name") ?? id,
       next: singleTarget(id, "Start event", flows),
+      form: readFormFields(raw, id),
     };
     add(node);
   }
@@ -329,6 +331,42 @@ function readNodes(
   attachBoundaryTimers(process, nodes, flows);
   assertTargetsResolve(nodes);
   return nodes;
+}
+
+const FORM_FIELD_TYPES = new Set<FormField["type"]>(["string", "long", "boolean", "enum"]);
+
+/** camunda:formData on a start event — the process's own input form. */
+function readFormFields(raw: XmlNode, elementId: NodeId): FormField[] {
+  const fields = toArray<XmlNode>(raw.extensionElements?.formData?.formField);
+
+  return fields.map((field) => {
+    const id = attr(field, "id");
+    if (!id) throw new BpmnParseError(`A form field on "${elementId}" is missing an id`);
+
+    const type = (attr(field, "type") ?? "string") as FormField["type"];
+    if (!FORM_FIELD_TYPES.has(type)) {
+      throw new BpmnParseError(
+        `Form field "${id}" has unsupported type "${type}" (expected ${[...FORM_FIELD_TYPES].join(", ")})`
+      );
+    }
+
+    const options = toArray<XmlNode>(field.value).map((option) => ({
+      id: attr(option, "id") ?? "",
+      name: attr(option, "name") ?? attr(option, "id") ?? "",
+    }));
+    if (type === "enum" && options.length === 0) {
+      throw new BpmnParseError(`Enum form field "${id}" has no <camunda:value> choices`);
+    }
+
+    return {
+      id,
+      label: attr(field, "label") ?? id,
+      type,
+      defaultValue: attr(field, "defaultValue"),
+      placeholder: attr(field, "placeholder"),
+      ...(options.length > 0 ? { options } : {}),
+    };
+  });
 }
 
 function readAutomatedTask<T extends ServiceTaskNode | BusinessRuleTaskNode>(

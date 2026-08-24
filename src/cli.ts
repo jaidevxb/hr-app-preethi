@@ -1,14 +1,10 @@
-import { readFileSync } from "node:fs";
 import { createInterface } from "node:readline";
-import { parseBpmn } from "./workflow/bpmnParser.js";
 import { WorkflowInstance } from "./workflow/engine.js";
 import { handlers } from "./workflow/handlers.js";
+import { loadProcessLibrary } from "./workflow/loadProcessLibrary.node.js";
+import type { FormField, StartEventNode, WorkflowContext } from "./workflow/types.js";
 
-// The web build imports the .bpmn through Vite's `?raw`; under plain Node we
-// read the same file off disk. Either way the process comes from the XML.
-const { definition } = parseBpmn(
-  readFileSync(new URL("./workflow/leaveRequestWorkflow.bpmn", import.meta.url), "utf8")
-);
+const library = loadProcessLibrary();
 
 const rl = createInterface({ input: process.stdin, output: process.stdout });
 const lines = rl[Symbol.asyncIterator]();
@@ -28,14 +24,50 @@ function printLog(instance: WorkflowInstance) {
   console.log("--------------------\n");
 }
 
+/** Prompt for one field, described entirely by the BPMN file's formData. */
+async function askField(field: FormField): Promise<unknown> {
+  if (field.type === "enum") {
+    const choices = field.options ?? [];
+    const list = choices.map((option, i) => `${i + 1}) ${option.name}`).join("  ");
+    const answer = (await ask(`${field.label} — ${list}: `)).trim();
+    const picked = choices[Number(answer) - 1] ?? choices[0];
+    return picked?.id ?? "";
+  }
+
+  if (field.type === "boolean") {
+    const answer = (await ask(`${field.label} [y/N]: `)).trim().toLowerCase();
+    return answer.startsWith("y");
+  }
+
+  const suffix = field.defaultValue ? ` [${field.defaultValue}]` : "";
+  const answer = (await ask(`${field.label}${suffix}: `)).trim() || field.defaultValue || "";
+  return field.type === "long" ? Number(answer) || 0 : answer || "—";
+}
+
+async function pickProcess() {
+  if (library.length === 1) return library[0];
+
+  console.log("Processes in the library:");
+  library.forEach((entry, i) => {
+    console.log(`  ${i + 1}) ${entry.definition.name}`);
+  });
+  const answer = (await ask(`Pick one [1-${library.length}]: `)).trim();
+  return library[Number(answer) - 1] ?? library[0];
+}
+
 async function main() {
-  console.log("=== Leave Request Approval (BPMN demo) ===\n");
+  console.log("=== BPMN Workflow Simulator ===\n");
 
-  const employeeName = (await ask("Employee name: ")) || "Employee";
-  const days = (await ask("Number of days: ")) || "1";
-  const reason = (await ask("Reason: ")) || "Personal";
+  const { definition } = await pickProcess();
+  console.log(`\n--- ${definition.name} ---\n`);
 
-  const instance = new WorkflowInstance(definition, { employeeName, days, reason }, handlers);
+  const start = definition.nodes[definition.startNodeId] as StartEventNode;
+  const initialContext: WorkflowContext = {};
+  for (const field of start.form) {
+    initialContext[field.id] = await askField(field);
+  }
+
+  const instance = new WorkflowInstance(definition, initialContext, handlers);
   instance.start();
 
   while (instance.getStatus() === "waiting") {

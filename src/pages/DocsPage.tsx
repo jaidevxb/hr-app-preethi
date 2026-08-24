@@ -73,6 +73,16 @@ const SHIPPED = [
       "Steps that run without a human. The BPMN file names a camunda:topic and the app registers the code behind it — the same split Camunda uses between a process and its external task workers, so the definition stays free of implementation.",
   },
   {
+    title: "A library of processes, not one",
+    detail:
+      "Every .bpmn file in src/workflow/processes/ is picked up automatically — the web build globs the folder, the CLI walks it with fs, and both hand the files to the same parser. Adding a process is adding a file: no registration step, no engine changes. Three ship today, and they were chosen to cover different mechanics rather than to be a product.",
+  },
+  {
+    title: "Each process brings its own form",
+    detail:
+      "Start forms are declared in the file as camunda:formData — field ids, labels, types, defaults, enum choices. The UI renders whatever the process asks for and the CLI prompts for the same fields, so a new process gets working inputs without touching a component.",
+  },
+  {
     title: "A custom-drawn diagram, not the stock renderer",
     detail:
       "The in-app diagram (this one) is hand-rendered SVG instead of bpmn-js's default output — bpmn-js paints everything via inline styles built for a white canvas, which fought every attempt to retheme it into this app's dark/light palette. It now reads its geometry from the file's own BPMNDI section, so it stays a faithful view of the same diagram Camunda Modeler would draw — with full control over the visuals.",
@@ -81,34 +91,24 @@ const SHIPPED = [
 
 const ROADMAP = [
   {
-    title: "A library of processes, not one",
-    detail:
-      "Adding a process is now adding a file — the parser does the rest. Drop in expense reimbursement and onboarding alongside leave approval, list them in a picker, and the claim below that “the engine is generic” stops being aspirational.",
-  },
-  {
-    title: "Forms described by the BPMN file",
-    detail:
-      "The request form is currently three hardcoded fields (name / days / reason). Camunda models form fields inside the XML; reading those would mean each process in the library brings its own form instead of borrowing the leave request's.",
-  },
-  {
     title: "Real timers on an accelerated clock",
     detail:
-      "Replace the “simulate timer expiry” button with a genuine scheduled timer running on a compressed clock — one simulated day per couple of seconds — so the escalation can be watched firing on the diagram instead of triggered by hand.",
+      "Replace the “simulate timer expiry” button with a genuine scheduled timer running on a compressed clock — one simulated day per couple of seconds — so the escalation can be watched firing on the diagram instead of triggered by hand. This is the most simulator-ish thing left undone.",
   },
   {
-    title: "Many concurrent instances, persistence, and a task inbox",
+    title: "Replay and step-through",
     detail:
-      "A dashboard of every in-flight request and a “My Tasks” view per assignee, surviving a refresh. localStorage first, a real database only if it earns it.",
-  },
-  {
-    title: "Replay and audit",
-    detail:
-      "Scrub a finished instance step by step and watch the token travel the diagram. The log and the BPMNDI waypoints needed for it are already there.",
+      "Scrub a finished instance step by step and watch the tokens travel the diagram. The log records which token did what and the BPMNDI waypoints are already parsed, so the pieces are in place.",
   },
   {
     title: "A validation panel",
     detail:
-      "Flag unreachable elements, tasks with no outgoing flow, gateways that can't decide. The parser already rejects the structural errors it would choke on; this surfaces the ones it can survive but shouldn't.",
+      "Flag unreachable elements, tasks with no outgoing flow, joins that can never fire. The parser already rejects the structural errors it would choke on; this surfaces the ones it can survive but shouldn't — including deadlocks the engine will happily sit in.",
+  },
+  {
+    title: "More of the BPMN vocabulary",
+    detail:
+      "Inclusive (OR) gateways, message and signal events, sub-processes, terminate end events. Each one is a new element in the glossary and a new behaviour in the engine — which is the whole point of the exercise.",
   },
   {
     title: "Diagram authoring, not just viewing",
@@ -120,14 +120,14 @@ const ROADMAP = [
     detail:
       "Swap the hand-rolled engine for Camunda 8 / Zeebe behind the same interface, once the mechanics are second nature. The parser is where that seam already sits.",
   },
-  {
-    title: "Auth + role-based assignment",
-    detail: "Only the actual manager can act on their own employee's request.",
-  },
-  {
-    title: "Notifications",
-    detail: "Email/Slack pings on task assignment and escalation.",
-  },
+];
+
+/** Things deliberately not being built — this is a simulator, not a product. */
+const NON_GOALS = [
+  "Auth and role-based assignment — every task is actionable by whoever is driving",
+  "A database, or instances that survive a refresh",
+  "A dashboard of concurrent instances, or a per-assignee task inbox",
+  "Email/Slack notifications",
 ];
 
 export function DocsPage() {
@@ -136,11 +136,15 @@ export function DocsPage() {
       <section className="card docs-section">
         <h2>What this is</h2>
         <p>
-          A small, self-contained demo that models a real HR process — leave/time-off approval — as a{" "}
-          <strong>BPMN 2.0 workflow</strong>. The CLI and this visual UI are two different front ends sitting on top
-          of the exact same workflow engine, and both read the same BPMN 2.0 XML file: it is parsed into the
-          process that runs <em>and</em> the diagram below, which is custom-rendered from the file's own
-          coordinates (see "Shipped" for why).
+          A <strong>BPMN 2.0 simulator</strong>: a hand-rolled workflow engine you can drive by hand, with a small
+          library of HR processes — leave approval, expense reimbursement, employee onboarding — to run through it.
+          Each one is a .bpmn file that gets parsed into the process that runs <em>and</em> the diagram above, which
+          is custom-rendered from the file's own coordinates (see "Shipped" for why). The CLI and this visual UI are
+          two front ends over the exact same engine.
+        </p>
+        <p className="muted">
+          It's a simulator, not a product. No auth, no database, no multi-user — those would add scaffolding without
+          teaching anything more about BPMN.
         </p>
       </section>
 
@@ -195,10 +199,10 @@ export function DocsPage() {
       <section className="card docs-section">
         <h2>What's the use</h2>
         <p>
-          The demo is leave approval, but the shape generalizes to almost any "submit → review → branch → notify"
-          business process: expense reimbursement, procurement sign-off, onboarding checklists. The engine (
-          <code>engine.ts</code> + <code>types.ts</code>) is generic — a new process is a new data definition, like{" "}
-          <code>leaveRequestWorkflow.ts</code>, not new engine code.
+          The shape generalizes to almost any "submit → review → branch → notify" business process, which is why the
+          library holds three of them: leave approval, expense reimbursement and onboarding all run on the same
+          engine without a line of process-specific code. A new one is a new <code>.bpmn</code> file, not new engine
+          code — that claim used to be aspirational, and now it's how the folder works.
         </p>
       </section>
 
@@ -206,12 +210,20 @@ export function DocsPage() {
         <h2>Architecture at a glance</h2>
         <ul className="filelist">
           <li>
-            <code>src/workflow/leaveRequestWorkflow.bpmn</code> — real BPMN 2.0 XML, and the single source of truth
-            for both the flow and the drawing
+            <code>src/workflow/processes/*.bpmn</code> — real BPMN 2.0 XML, and the single source of truth for both
+            the flow and the drawing. Drop a file in, get a process
           </li>
           <li>
-            <code>src/workflow/bpmnParser.ts</code> — parses that file into a <code>WorkflowDefinition</code> plus a
+            <code>src/workflow/processes/index.ts</code> — globs the folder for the web build;{" "}
+            <code>loadProcessLibrary.node.ts</code> does the same with <code>fs</code> for the CLI
+          </li>
+          <li>
+            <code>src/workflow/bpmnParser.ts</code> — parses a file into a <code>WorkflowDefinition</code> plus a
             diagram layout read from its BPMNDI section
+          </li>
+          <li>
+            <code>src/workflow/handlers.ts</code> — the code behind each <code>camunda:topic</code>, kept out of the
+            process definitions
           </li>
           <li>
             <code>src/workflow/conditionExpression.ts</code> — the small, strict grammar gateway conditions are
@@ -225,8 +237,7 @@ export function DocsPage() {
             / fireTimer)
           </li>
           <li>
-            <code>src/workflow/leaveRequestWorkflow.ts</code> — loads the .bpmn (Vite <code>?raw</code>) and parses
-            it; <code>src/cli.ts</code> reads the same file with <code>fs</code>
+            <code>src/cli.ts</code> — terminal driver: pick a process, fill its form, walk it
           </li>
           <li>
             <code>src/components/ProcessDiagram.tsx</code> — custom SVG renderer driven by the parsed layout;
@@ -242,9 +253,14 @@ export function DocsPage() {
       <section className="card docs-section">
         <h2>Current scope — v1</h2>
         <ul>
-          <li>One workflow definition: Leave Request — though adding another is now adding a .bpmn file</li>
+          <li>Three processes in the library; adding a fourth is adding a .bpmn file to the folder</li>
           <li>One in-memory instance at a time — nothing persists across a page refresh or a new CLI run</li>
           <li>The 3-day SLA timer is simulated with a button, not a real clock</li>
+          <li>Start forms come from the file; per-task forms don't exist yet</li>
+          <li>
+            A deadlocked join (a token waiting on a branch that can't arrive) is detected and reported, but nothing
+            unwinds it
+          </li>
           <li>
             Eight BPMN element types are understood (start, user task, service task, business rule task, exclusive
             gateway, parallel gateway, boundary timer, end); anything else in a file is rejected rather than
@@ -287,6 +303,21 @@ export function DocsPage() {
             </li>
           ))}
         </ol>
+      </section>
+
+      <section className="card docs-section">
+        <h2>Deliberately not building</h2>
+        <ul>
+          {NON_GOALS.map((item) => (
+            <li key={item} className="muted">
+              {item}
+            </li>
+          ))}
+        </ul>
+        <p className="muted">
+          Each of these is product scaffolding. None of them would teach anything more about BPMN, which is what
+          this exists for.
+        </p>
       </section>
 
       <section className="card docs-section">

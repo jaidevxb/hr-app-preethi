@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { BpmnParseError, parseBpmn, parseIsoDuration } from "./bpmnParser.js";
 import { ConditionExpressionError, parseCondition } from "./conditionExpression.js";
-import { leaveRequestProcess } from "./leaveRequestWorkflow.js";
+import { leaveRequestProcess } from "./processes/index.js";
 
 const { definition, layout } = leaveRequestProcess;
 

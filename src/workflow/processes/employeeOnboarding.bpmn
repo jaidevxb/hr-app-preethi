@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                   xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+                   xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+                   xmlns:di="http://www.omg.org/spec/DD/20100524/DI"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xmlns:camunda="http://camunda.org/schema/1.0/bpmn"
+                   xmlns:hr="https://leave-request-workflow.example/schema"
+                   id="Definitions_EmployeeOnboarding"
+                   targetNamespace="https://leave-request-workflow.example/bpmn">
+
+  <bpmn:process id="Process_EmployeeOnboarding" name="Employee Onboarding" isExecutable="false">
+
+    <bpmn:startEvent id="start" name="New Hire Accepted">
+      <bpmn:extensionElements>
+        <camunda:formData>
+          <camunda:formField id="employeeName" label="New hire" type="string" hr:placeholder="e.g. Meera" />
+          <camunda:formField id="role" label="Role" type="string" hr:placeholder="e.g. Backend Engineer" />
+          <camunda:formField id="remote" label="Remote?" type="boolean" />
+        </camunda:formData>
+      </bpmn:extensionElements>
+      <bpmn:outgoing>flow_start_split</bpmn:outgoing>
+    </bpmn:startEvent>
+
+    <!-- Three tracks run at once; day one can't start until all three land. -->
+    <bpmn:parallelGateway id="splitTracks" name="Parallel Split">
+      <bpmn:incoming>flow_start_split</bpmn:incoming>
+      <bpmn:outgoing>flow_split_workstation</bpmn:outgoing>
+      <bpmn:outgoing>flow_split_accounts</bpmn:outgoing>
+      <bpmn:outgoing>flow_split_buddy</bpmn:outgoing>
+    </bpmn:parallelGateway>
+
+    <bpmn:userTask id="prepareWorkstation" name="Prepare Workstation" camunda:assignee="IT">
+      <bpmn:incoming>flow_split_workstation</bpmn:incoming>
+      <bpmn:outgoing>flow_workstation_join</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:serviceTask id="createAccounts" name="Create Accounts" camunda:topic="onboarding.createAccounts">
+      <bpmn:incoming>flow_split_accounts</bpmn:incoming>
+      <bpmn:outgoing>flow_accounts_join</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:userTask id="assignBuddy" name="Assign Buddy" camunda:assignee="HR">
+      <bpmn:incoming>flow_split_buddy</bpmn:incoming>
+      <bpmn:outgoing>flow_buddy_join</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:parallelGateway id="joinTracks" name="Parallel Join">
+      <bpmn:incoming>flow_workstation_join</bpmn:incoming>
+      <bpmn:incoming>flow_accounts_join</bpmn:incoming>
+      <bpmn:incoming>flow_buddy_join</bpmn:incoming>
+      <bpmn:outgoing>flow_join_orientation</bpmn:outgoing>
+    </bpmn:parallelGateway>
+
+    <bpmn:userTask id="orientation" name="Day 1 Orientation" camunda:assignee="HR">
+      <bpmn:incoming>flow_join_orientation</bpmn:incoming>
+      <bpmn:outgoing>flow_orientation_end</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:endEvent id="endOnboarded" name="Onboarding Complete" hr:outcome="onboarded">
+      <bpmn:incoming>flow_orientation_end</bpmn:incoming>
+    </bpmn:endEvent>
+
+    <bpmn:sequenceFlow id="flow_start_split" sourceRef="start" targetRef="splitTracks" />
+    <bpmn:sequenceFlow id="flow_split_workstation" sourceRef="splitTracks" targetRef="prepareWorkstation" />
+    <bpmn:sequenceFlow id="flow_split_accounts" sourceRef="splitTracks" targetRef="createAccounts" />
+    <bpmn:sequenceFlow id="flow_split_buddy" sourceRef="splitTracks" targetRef="assignBuddy" />
+    <bpmn:sequenceFlow id="flow_workstation_join" sourceRef="prepareWorkstation" targetRef="joinTracks" />
+    <bpmn:sequenceFlow id="flow_accounts_join" sourceRef="createAccounts" targetRef="joinTracks" />
+    <bpmn:sequenceFlow id="flow_buddy_join" sourceRef="assignBuddy" targetRef="joinTracks" />
+    <bpmn:sequenceFlow id="flow_join_orientation" sourceRef="joinTracks" targetRef="orientation" />
+    <bpmn:sequenceFlow id="flow_orientation_end" sourceRef="orientation" targetRef="endOnboarded" />
+
+  </bpmn:process>
+
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="Process_EmployeeOnboarding">
+
+      <bpmndi:BPMNShape id="start_di" bpmnElement="start">
+        <dc:Bounds x="140" y="322" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="115" y="364" width="86" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="splitTracks_di" bpmnElement="splitTracks">
+        <dc:Bounds x="240" y="315" width="50" height="50" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="prepareWorkstation_di" bpmnElement="prepareWorkstation">
+        <dc:Bounds x="350" y="180" width="120" height="80" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="createAccounts_di" bpmnElement="createAccounts">
+        <dc:Bounds x="350" y="300" width="120" height="80" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="assignBuddy_di" bpmnElement="assignBuddy">
+        <dc:Bounds x="350" y="420" width="120" height="80" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="joinTracks_di" bpmnElement="joinTracks">
+        <dc:Bounds x="530" y="315" width="50" height="50" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="orientation_di" bpmnElement="orientation">
+        <dc:Bounds x="630" y="300" width="120" height="80" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="endOnboarded_di" bpmnElement="endOnboarded">
+        <dc:Bounds x="820" y="322" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="785" y="364" width="106" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNEdge id="flow_start_split_di" bpmnElement="flow_start_split">
+        <di:waypoint x="176" y="340" />
+        <di:waypoint x="240" y="340" />
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="flow_split_workstation_di" bpmnElement="flow_split_workstation">
+        <di:waypoint x="265" y="315" />
+        <di:waypoint x="265" y="220" />
+        <di:waypoint x="350" y="220" />
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="flow_split_accounts_di" bpmnElement="flow_split_accounts">
+        <di:waypoint x="290" y="340" />
+        <di:waypoint x="350" y="340" />
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="flow_split_buddy_di" bpmnElement="flow_split_buddy">
+        <di:waypoint x="265" y="365" />
+        <di:waypoint x="265" y="460" />
+        <di:waypoint x="350" y="460" />
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="flow_workstation_join_di" bpmnElement="flow_workstation_join">
+        <di:waypoint x="470" y="220" />
+        <di:waypoint x="555" y="220" />
+        <di:waypoint x="555" y="315" />
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="flow_accounts_join_di" bpmnElement="flow_accounts_join">
+        <di:waypoint x="470" y="340" />
+        <di:waypoint x="530" y="340" />
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="flow_buddy_join_di" bpmnElement="flow_buddy_join">
+        <di:waypoint x="470" y="460" />
+        <di:waypoint x="555" y="460" />
+        <di:waypoint x="555" y="365" />
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="flow_join_orientation_di" bpmnElement="flow_join_orientation">
+        <di:waypoint x="580" y="340" />
+        <di:waypoint x="630" y="340" />
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="flow_orientation_end_di" bpmnElement="flow_orientation_end">
+        <di:waypoint x="750" y="340" />
+        <di:waypoint x="820" y="340" />
+      </bpmndi:BPMNEdge>
+
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+
+</bpmn:definitions>

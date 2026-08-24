@@ -18,10 +18,26 @@ interface BaseNode {
   name: string;
 }
 
+/**
+ * A field on a start form, from `camunda:formData` in the BPMN file — so each
+ * process brings its own inputs instead of the UI hardcoding one process's.
+ */
+export interface FormField {
+  id: string;
+  label: string;
+  type: "string" | "long" | "boolean" | "enum";
+  defaultValue?: string;
+  placeholder?: string;
+  /** Choices for `enum` fields. */
+  options?: Array<{ id: string; name: string }>;
+}
+
 // BPMN: Start Event
 export interface StartEventNode extends BaseNode {
   type: "startEvent";
   next: NodeId;
+  /** Empty when the file declares no start form. */
+  form: FormField[];
 }
 
 // BPMN: End Event

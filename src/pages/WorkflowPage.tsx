@@ -1,34 +1,69 @@
+import { useState } from "react";
 import { ActionPanel } from "../components/ActionPanel.js";
 import { LogTimeline } from "../components/LogTimeline.js";
 import { ProcessDiagram } from "../components/ProcessDiagram.js";
 import { RequestForm } from "../components/RequestForm.js";
 import { useWorkflowInstance } from "../hooks/useWorkflowInstance.js";
 import { handlers } from "../workflow/handlers.js";
-import { leaveRequestProcess } from "../workflow/leaveRequestWorkflow.js";
+import { DEFAULT_PROCESS_ID, findProcess, processLibrary } from "../workflow/processes/index.js";
+import type { StartEventNode } from "../workflow/types.js";
 
-const { definition } = leaveRequestProcess;
+/** Values the engine set itself aren't worth echoing back as "you entered". */
+function contextEntries(context: Record<string, unknown>) {
+  return Object.entries(context).filter(([, value]) => value !== undefined && value !== "");
+}
 
 export function WorkflowPage() {
+  const [processId, setProcessId] = useState(DEFAULT_PROCESS_ID);
+  const process = findProcess(processId);
+  const { definition } = process;
+
   const { instance, submit, completeTask, fireTimer, reset } = useWorkflowInstance(
     definition,
     handlers
   );
 
   const status = instance?.getStatus();
-  const context = instance?.getContext();
+  const context = instance?.getContext() ?? {};
   const activeTasks = instance?.getActiveTasks() ?? [];
   const outcome = status === "completed" ? instance?.getEndEvents()[0] : undefined;
+  const start = definition.nodes[definition.startNodeId] as StartEventNode;
 
   return (
     <div className="page">
-      <ProcessDiagram process={leaveRequestProcess} instance={instance} />
+      <div className="card process-picker">
+        <label>
+          Process
+          <select
+            value={processId}
+            onChange={(event) => {
+              setProcessId(event.target.value);
+              reset();
+            }}
+          >
+            {processLibrary.map((candidate) => (
+              <option key={candidate.definition.id} value={candidate.definition.id}>
+                {candidate.definition.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <p className="muted">
+          {processLibrary.length} processes, each one a .bpmn file in{" "}
+          <code>src/workflow/processes/</code>. The engine is the same for all of them.
+        </p>
+      </div>
 
-      {!instance && <RequestForm onSubmit={submit} />}
+      <ProcessDiagram process={process} instance={instance} />
+
+      {!instance && (
+        <RequestForm start={start} processName={definition.name} onSubmit={submit} />
+      )}
 
       {activeTasks.length > 1 && (
         <p className="muted parallel-note">
           {activeTasks.length} tasks are waiting at the same time — the process split into parallel
-          branches and won't finish until both are done.
+          branches and won't finish until all of them are done.
         </p>
       )}
 
@@ -47,14 +82,16 @@ export function WorkflowPage() {
       {outcome && (
         <div className={`card outcome outcome-${outcome.outcome}`}>
           <h2>{outcome.name}</h2>
-          <p className="muted">
-            {String(context?.employeeName)} — {String(context?.days)} day(s) — {String(context?.reason)}
-          </p>
-          {context?.leaveBalance !== undefined && (
-            <p className="muted">Leave balance now {String(context.leaveBalance)} day(s).</p>
-          )}
+          <dl className="context-dump">
+            {contextEntries(context).map(([key, value]) => (
+              <div key={key}>
+                <dt>{key}</dt>
+                <dd>{String(value)}</dd>
+              </div>
+            ))}
+          </dl>
           <button className="btn btn-ghost" onClick={reset}>
-            Start another request
+            Run it again
           </button>
         </div>
       )}

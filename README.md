@@ -1,18 +1,31 @@
-# HR Workflow — Leave Request (BPMN, v1)
+# BPMN Workflow Simulator
 
-A hand-rolled workflow engine modeling a Leave Request Approval process.
-The BPMN 2.0 XML file *is* the process: `leaveRequestWorkflow.bpmn` is parsed
-at load into both the executable definition the engine walks and the diagram
-that gets drawn, positions and all. Edit it in Camunda Modeler or bpmn.io and
-both follow — there is no hand-written second copy to keep in sync.
+A hand-rolled BPMN 2.0 engine you can drive by hand, with a library of HR
+processes to run through it. This is a **simulator for learning BPMN**, not a
+product — there's no auth, no database, no multi-user anything, and that's on
+purpose.
 
-Rendering is a custom SVG layer fed by the file's own BPMNDI coordinates
+The BPMN 2.0 XML files *are* the processes. Each one is parsed at load into
+both the executable definition the engine walks and the diagram that gets
+drawn, positions and all. Edit one in Camunda Modeler or bpmn.io and both
+follow — there is no hand-written second copy to keep in sync. Adding a
+process to the simulator is adding a file to `src/workflow/processes/`.
+
+Rendering is a custom SVG layer fed by each file's own BPMNDI coordinates
 (bpmn-js's default renderer paints via inline styles built for a white canvas
 and wasn't worth fighting to retheme — see the in-app Docs page for the full
 story). Two front ends sit on top of the same engine: an interactive CLI and a
 React/Vite web UI with a full in-app Docs page — what/why/roadmap.
 
-## Flow
+## The process library
+
+| Process | Shows off |
+| --- | --- |
+| **Leave Request Approval** | Boundary timer with SLA escalation, exclusive gateway, an AND-split into a user task + service task that must rejoin before the process ends |
+| **Expense Reimbursement** | A business rule task that decides whether a human is needed at all — small claims skip Finance entirely |
+| **Employee Onboarding** | A three-way parallel split (IT, accounts, buddy) that the join holds until every track lands |
+
+### Leave Request, in detail
 
 ```
 (Start: Request Submitted)
@@ -33,34 +46,35 @@ React/Vite web UI with a full in-app Docs page — what/why/roadmap.
                                                     (End: Approved)
 ```
 
-Elements demonstrated: Start/End Events, User Tasks, a Service Task, an
-Exclusive (Decision) Gateway, a Parallel (AND) Gateway used as both split and
-join, and a boundary Timer Event (simulated via a `fireTimer()` call instead
-of a real clock, since this is v1).
+Elements understood by the engine: Start/End Events, User Tasks, Service
+Tasks, Business Rule Tasks, Exclusive (Decision) Gateways, Parallel (AND)
+Gateways as both split and join, and boundary Timer Events (fired by hand via
+`fireTimer()` rather than a real clock — see the roadmap).
 
 ## Run it
 
 ```bash
 npm install
 npm run dev        # web UI at http://localhost:5173 — Workflow tab + Docs tab
-npm run cli        # interactive terminal walkthrough of the same flow
-npm test           # unit tests covering approve / reject / timer-escalation paths
+npm run cli        # terminal driver; pick a process, then walk it
+npm test           # engine, parser, diagram and per-process path coverage
 npm run build      # production build of the web UI (dist/) — what Vercel runs
-npm run typecheck  # type-check the CLI/engine side (tsc, no emit)
+npm run typecheck  # type-check everything (tsc, no emit)
 ```
 
 ## Structure
 
-- `src/workflow/leaveRequestWorkflow.bpmn` — **the source of truth.** Real BPMN 2.0 XML: flow, assignees (`camunda:assignee`), the 3-day SLA (`P3D`), and every diagram coordinate
-- `src/workflow/bpmnParser.ts` — turns that XML into a `WorkflowDefinition` + a diagram layout
+- `src/workflow/processes/*.bpmn` — **the source of truth.** Real BPMN 2.0 XML: flow, assignees (`camunda:assignee`), handler topics (`camunda:topic`), SLAs (`P3D`), start forms (`camunda:formData`), and every diagram coordinate
+- `src/workflow/processes/index.ts` — globs and parses every file in that folder (Vite); `loadProcessLibrary.node.ts` does the same with `fs` for the CLI
+- `src/workflow/bpmnParser.ts` — turns the XML into a `WorkflowDefinition` + a diagram layout
 - `src/workflow/conditionExpression.ts` — tiny, deliberately limited evaluator for gateway conditions (no `eval`)
+- `src/workflow/engine.ts` — the token-based `WorkflowInstance` engine (start, completeTask, fireTimer)
+- `src/workflow/handlers.ts` — the code behind each `camunda:topic`, kept out of the process definitions
 - `src/workflow/types.ts` — generic BPMN-ish node/definition types
-- `src/workflow/engine.ts` — reusable `WorkflowInstance` engine (start, completeTask, fireTimer)
-- `src/workflow/leaveRequestWorkflow.ts` — loads the .bpmn via Vite's `?raw` and parses it
-- `src/cli.ts` — interactive terminal driver; reads the same .bpmn with `fs`
+- `src/cli.ts` — interactive terminal driver
 - `src/hooks/useWorkflowInstance.ts` — React wrapper around the engine
 - `src/components/ProcessDiagram.tsx` — custom SVG renderer, driven entirely by the parsed layout
-- `src/components/`, `src/pages/` — the web UI (diagram + forms + Docs page)
+- `src/components/`, `src/pages/` — the web UI (picker + diagram + forms + Docs page)
 
 The Docs page (in-app, at the "Docs" tab) covers what BPMN is, why this
 project is built the way it is, the element glossary, current scope, and the
@@ -68,8 +82,8 @@ full roadmap — that content isn't duplicated here.
 
 ## Next steps (not built yet)
 
-See the Roadmap section on the in-app Docs page. Short version: a library of
-several processes (now that adding one is just adding a file), more BPMN
-element types — parallel gateways and service tasks first — then real timers,
-persistence and a task inbox, and eventually a real BPMN 2.0 engine
-(Camunda/Zeebe) behind the same interface.
+See the Roadmap section on the in-app Docs page. Short version: real timers on
+a compressed clock so escalations can be watched firing, step-through replay
+of a finished instance, a validation panel, more BPMN element types, and
+eventually diagram authoring plus a real BPMN engine (Camunda/Zeebe) behind
+the same interface.

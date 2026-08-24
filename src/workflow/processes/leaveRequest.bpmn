@@ -12,6 +12,13 @@
   <bpmn:process id="Process_LeaveRequest" name="Leave Request Approval" isExecutable="false">
 
     <bpmn:startEvent id="start" name="Request Submitted">
+      <bpmn:extensionElements>
+        <camunda:formData>
+          <camunda:formField id="employeeName" label="Employee name" type="string" hr:placeholder="e.g. Priya" />
+          <camunda:formField id="days" label="Number of days" type="long" defaultValue="1" />
+          <camunda:formField id="reason" label="Reason" type="string" hr:placeholder="e.g. Family trip" />
+        </camunda:formData>
+      </bpmn:extensionElements>
       <bpmn:outgoing>flow_start_managerReview</bpmn:outgoing>
     </bpmn:startEvent>
 

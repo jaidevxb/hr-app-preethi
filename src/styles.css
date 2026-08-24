@@ -273,7 +273,9 @@ form label {
   color: var(--muted);
 }
 
-form input {
+form input,
+form select,
+.process-picker select {
   display: block;
   width: 100%;
   margin-top: 0.45rem;
@@ -293,14 +295,75 @@ form input::placeholder {
   opacity: 0.85;
 }
 
-form input:hover {
+form input:hover,
+form select:hover,
+.process-picker select:hover {
   border-color: var(--accent);
 }
 
-form input:focus {
+form input:focus,
+form select:focus,
+.process-picker select:focus {
   outline: none;
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+/* Boolean form fields sit inline rather than stacked over an input */
+.checkbox-label {
+  display: flex !important;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: auto;
+  margin: 0;
+  accent-color: var(--accent);
+  box-shadow: none;
+}
+
+/* Process library picker */
+.process-picker label {
+  display: block;
+  margin-bottom: 0.6rem;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.process-picker p {
+  margin: 0;
+  font-size: 0.8rem;
+}
+
+.process-picker code {
+  font-size: 0.78rem;
+}
+
+/* Context key/value dump on the outcome card */
+.context-dump {
+  margin: 0.4rem 0 1rem;
+  display: grid;
+  gap: 0.3rem;
+}
+
+.context-dump > div {
+  display: flex;
+  gap: 0.6rem;
+  font-size: 0.85rem;
+}
+
+.context-dump dt {
+  min-width: 8.5rem;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+}
+
+.context-dump dd {
+  margin: 0;
+  font-weight: 500;
 }
 
 form > .btn-block {
@@ -592,6 +655,19 @@ form > .btn-block {
 .timeline li:last-child {
   border-bottom: none;
   padding-bottom: 0;
+}
+
+/* Token tag, shown only once a process has actually split into branches */
+.timeline-token {
+  flex-shrink: 0;
+  min-width: 1.6rem;
+  padding: 0.1rem 0.35rem;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--muted);
+  text-align: center;
 }
 
 .timeline-node {
