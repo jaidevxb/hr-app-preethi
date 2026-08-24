@@ -1,102 +1,10 @@
+import type { BpmnProcess, DiagramEdge, DiagramShape } from "../workflow/bpmnParser.js";
 import type { WorkflowInstance } from "../workflow/engine.js";
 
-type NodeKind = "start" | "end" | "task" | "gateway" | "boundary";
 type NodeState = "pending" | "visited" | "current";
 
-interface DiagramNode {
-  id: string;
-  kind: NodeKind;
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-  label?: { x: number; y: number; w: number; lines: string[] };
-}
-
-interface DiagramEdge {
-  id: string;
-  points: [number, number][];
-  label?: { x: number; y: number; text: string };
-}
-
-const NODES: DiagramNode[] = [
-  {
-    id: "start",
-    kind: "start",
-    x: 140,
-    y: 242,
-    w: 36,
-    h: 36,
-    label: { x: 115, y: 296, w: 86, lines: ["Request", "Submitted"] },
-  },
-  { id: "managerReview", kind: "task", x: 270, y: 220, w: 120, h: 80, label: { x: 270, y: 254, w: 120, lines: ["Manager Review"] } },
-  {
-    id: "managerReviewTimer",
-    kind: "boundary",
-    x: 312,
-    y: 282,
-    w: 36,
-    h: 36,
-    label: { x: 345, y: 393, w: 90, lines: ["3-day SLA"] },
-  },
-  {
-    id: "escalatedReview",
-    kind: "task",
-    x: 270,
-    y: 460,
-    w: 120,
-    h: 80,
-    label: { x: 270, y: 486, w: 120, lines: ["Escalated Review", "(Skip-Level)"] },
-  },
-  {
-    id: "approvalGateway",
-    kind: "gateway",
-    x: 500,
-    y: 235,
-    w: 50,
-    h: 50,
-    label: { x: 490, y: 222, w: 70, lines: ["Approved?"] },
-  },
-  {
-    id: "hrProcessing",
-    kind: "task",
-    x: 660,
-    y: 220,
-    w: 120,
-    h: 80,
-    label: { x: 660, y: 246, w: 120, lines: ["HR Processes", "Leave"] },
-  },
-  {
-    id: "endApproved",
-    kind: "end",
-    x: 862,
-    y: 242,
-    w: 36,
-    h: 36,
-    label: { x: 827, y: 296, w: 106, lines: ["Leave Approved"] },
-  },
-  {
-    id: "endRejected",
-    kind: "end",
-    x: 507,
-    y: 500,
-    w: 36,
-    h: 36,
-    label: { x: 472, y: 554, w: 106, lines: ["Leave Rejected"] },
-  },
-];
-
-const EDGES: DiagramEdge[] = [
-  { id: "e1", points: [[176, 260], [270, 260]] },
-  { id: "e2", points: [[390, 260], [500, 260]] },
-  { id: "e3", points: [[330, 318], [330, 460]] },
-  { id: "e4", points: [[390, 500], [500, 500], [500, 260]] },
-  { id: "e5", points: [[550, 260], [660, 260]], label: { x: 605, y: 244, text: "Approved" } },
-  { id: "e6", points: [[525, 285], [525, 500]], label: { x: 563, y: 396, text: "Rejected" } },
-  { id: "e7", points: [[780, 260], [862, 260]] },
-];
-
-const VIEWBOX = "100 190 850 385";
+/** Vertical gap between wrapped label lines; matches the parser's metrics. */
+const LINE_HEIGHT = 13;
 
 function pathFor(points: [number, number][]): string {
   return points.map(([x, y], i) => `${i === 0 ? "M" : "L"}${x},${y}`).join(" ");
@@ -114,31 +22,33 @@ function visitedNodeIds(instance: WorkflowInstance): string[] {
   return [...seen];
 }
 
-function Node({ node, state }: { node: DiagramNode; state: NodeState }) {
-  const cx = node.x + node.w / 2;
-  const cy = node.y + node.h / 2;
+function Shape({ shape, state }: { shape: DiagramShape; state: NodeState }) {
+  const cx = shape.x + shape.w / 2;
+  const cy = shape.y + shape.h / 2;
   const className = `diagram-node diagram-node--${state}`;
 
   return (
     <g className={className}>
-      {node.kind === "task" && <rect className="diagram-shape" x={node.x} y={node.y} width={node.w} height={node.h} rx={12} />}
+      {shape.kind === "task" && (
+        <rect className="diagram-shape" x={shape.x} y={shape.y} width={shape.w} height={shape.h} rx={12} />
+      )}
 
-      {node.kind === "start" && <circle className="diagram-shape diagram-shape--start" cx={cx} cy={cy} r={node.w / 2} />}
+      {shape.kind === "start" && <circle className="diagram-shape diagram-shape--start" cx={cx} cy={cy} r={shape.w / 2} />}
 
-      {node.kind === "end" && <circle className="diagram-shape diagram-shape--end" cx={cx} cy={cy} r={node.w / 2} />}
+      {shape.kind === "end" && <circle className="diagram-shape diagram-shape--end" cx={cx} cy={cy} r={shape.w / 2} />}
 
-      {node.kind === "boundary" && (
+      {shape.kind === "boundary" && (
         <>
-          <circle className="diagram-shape diagram-shape--boundary" cx={cx} cy={cy} r={node.w / 2} />
+          <circle className="diagram-shape diagram-shape--boundary" cx={cx} cy={cy} r={shape.w / 2} />
           <path className="diagram-glyph" d={`M${cx},${cy - 6} L${cx},${cy} L${cx + 5},${cy + 3}`} />
         </>
       )}
 
-      {node.kind === "gateway" && (
+      {shape.kind === "gateway" && (
         <>
           <polygon
             className="diagram-shape"
-            points={`${cx},${node.y} ${node.x + node.w},${cy} ${cx},${node.y + node.h} ${node.x},${cy}`}
+            points={`${cx},${shape.y} ${shape.x + shape.w},${cy} ${cx},${shape.y + shape.h} ${shape.x},${cy}`}
           />
           <path
             className="diagram-glyph diagram-glyph--bold"
@@ -147,10 +57,15 @@ function Node({ node, state }: { node: DiagramNode; state: NodeState }) {
         </>
       )}
 
-      {node.label && (
-        <text className="diagram-label" x={node.label.x + node.label.w / 2} y={node.label.y} textAnchor="middle">
-          {node.label.lines.map((line, i) => (
-            <tspan key={i} x={node.label!.x + node.label!.w / 2} dy={i === 0 ? 0 : 13}>
+      {shape.label && (
+        <text
+          className="diagram-label"
+          x={shape.label.x + shape.label.w / 2}
+          y={shape.label.y}
+          textAnchor="middle"
+        >
+          {shape.label.lines.map((line, i) => (
+            <tspan key={i} x={shape.label!.x + shape.label!.w / 2} dy={i === 0 ? 0 : LINE_HEIGHT}>
               {line}
             </tspan>
           ))}
@@ -173,29 +88,51 @@ function Edge({ edge }: { edge: DiagramEdge }) {
   );
 }
 
-function WorkflowDiagram({ visitedIds, currentId }: { visitedIds: string[]; currentId?: string }) {
+function WorkflowDiagram({
+  process,
+  visitedIds,
+  currentId,
+}: {
+  process: BpmnProcess;
+  visitedIds: string[];
+  currentId?: string;
+}) {
+  const { layout, definition } = process;
+
   return (
     <div className="diagram-frame">
-      <svg className="diagram-svg" viewBox={VIEWBOX} preserveAspectRatio="xMidYMid meet" role="img" aria-label="Leave request process diagram">
+      <svg
+        className="diagram-svg"
+        viewBox={layout.viewBox}
+        preserveAspectRatio="xMidYMid meet"
+        role="img"
+        aria-label={`${definition.name} process diagram`}
+      >
         <defs>
           <marker id="diagram-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
             <path d="M0,0 L10,5 L0,10 z" className="diagram-arrowhead" />
           </marker>
         </defs>
 
-        {EDGES.map((edge) => (
+        {layout.edges.map((edge) => (
           <Edge key={edge.id} edge={edge} />
         ))}
 
-        {NODES.map((node) => (
-          <Node key={node.id} node={node} state={stateOf(node.id, visitedIds, currentId)} />
+        {layout.shapes.map((shape) => (
+          <Shape key={shape.id} shape={shape} state={stateOf(shape.id, visitedIds, currentId)} />
         ))}
       </svg>
     </div>
   );
 }
 
-export function ProcessDiagram({ instance }: { instance: WorkflowInstance | null }) {
+export function ProcessDiagram({
+  process,
+  instance,
+}: {
+  process: BpmnProcess;
+  instance: WorkflowInstance | null;
+}) {
   const isWaiting = instance?.getStatus() === "waitingOnTask";
   const isCompleted = instance?.getStatus() === "completed";
 
@@ -214,7 +151,7 @@ export function ProcessDiagram({ instance }: { instance: WorkflowInstance | null
         <span className="eyebrow">{instance ? "In Progress" : "Process Overview"}</span>
         <p className="muted stepper-subtitle">{subtitle}</p>
       </div>
-      <WorkflowDiagram visitedIds={visitedIds} currentId={currentId} />
+      <WorkflowDiagram process={process} visitedIds={visitedIds} currentId={currentId} />
     </div>
   );
 }

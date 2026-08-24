@@ -4,6 +4,8 @@
                    xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
                    xmlns:di="http://www.omg.org/spec/DD/20100524/DI"
                    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xmlns:camunda="http://camunda.org/schema/1.0/bpmn"
+                   xmlns:hr="https://leave-request-workflow.example/schema"
                    id="Definitions_LeaveRequest"
                    targetNamespace="https://leave-request-workflow.example/bpmn">
 
@@ -13,7 +15,7 @@
       <bpmn:outgoing>flow_start_managerReview</bpmn:outgoing>
     </bpmn:startEvent>
 
-    <bpmn:userTask id="managerReview" name="Manager Review">
+    <bpmn:userTask id="managerReview" name="Manager Review" camunda:assignee="Manager">
       <bpmn:incoming>flow_start_managerReview</bpmn:incoming>
       <bpmn:outgoing>flow_managerReview_gateway</bpmn:outgoing>
     </bpmn:userTask>
@@ -25,28 +27,28 @@
       </bpmn:timerEventDefinition>
     </bpmn:boundaryEvent>
 
-    <bpmn:userTask id="escalatedReview" name="Escalated Review (Skip-Level)">
+    <bpmn:userTask id="escalatedReview" name="Escalated Review (Skip-Level)" camunda:assignee="Skip-level Manager">
       <bpmn:incoming>flow_timer_escalatedReview</bpmn:incoming>
       <bpmn:outgoing>flow_escalatedReview_gateway</bpmn:outgoing>
     </bpmn:userTask>
 
-    <bpmn:exclusiveGateway id="approvalGateway" name="Approved?">
+    <bpmn:exclusiveGateway id="approvalGateway" name="Approved?" default="flow_gateway_endRejected">
       <bpmn:incoming>flow_managerReview_gateway</bpmn:incoming>
       <bpmn:incoming>flow_escalatedReview_gateway</bpmn:incoming>
       <bpmn:outgoing>flow_gateway_hrProcessing</bpmn:outgoing>
       <bpmn:outgoing>flow_gateway_endRejected</bpmn:outgoing>
     </bpmn:exclusiveGateway>
 
-    <bpmn:userTask id="hrProcessing" name="HR Processes Leave">
+    <bpmn:userTask id="hrProcessing" name="HR Processes Leave" camunda:assignee="HR">
       <bpmn:incoming>flow_gateway_hrProcessing</bpmn:incoming>
       <bpmn:outgoing>flow_hrProcessing_endApproved</bpmn:outgoing>
     </bpmn:userTask>
 
-    <bpmn:endEvent id="endApproved" name="Leave Approved">
+    <bpmn:endEvent id="endApproved" name="Leave Approved" hr:outcome="approved">
       <bpmn:incoming>flow_hrProcessing_endApproved</bpmn:incoming>
     </bpmn:endEvent>
 
-    <bpmn:endEvent id="endRejected" name="Leave Rejected">
+    <bpmn:endEvent id="endRejected" name="Leave Rejected" hr:outcome="rejected">
       <bpmn:incoming>flow_gateway_endRejected</bpmn:incoming>
     </bpmn:endEvent>
 
@@ -57,9 +59,9 @@
     <bpmn:sequenceFlow id="flow_gateway_hrProcessing" name="Approved" sourceRef="approvalGateway" targetRef="hrProcessing">
       <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">decision == "approved"</bpmn:conditionExpression>
     </bpmn:sequenceFlow>
-    <bpmn:sequenceFlow id="flow_gateway_endRejected" name="Rejected" sourceRef="approvalGateway" targetRef="endRejected">
-      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">decision == "rejected"</bpmn:conditionExpression>
-    </bpmn:sequenceFlow>
+    <!-- Default flow: per BPMN it carries no conditionExpression; the gateway's
+         `default` attribute points here, so it is taken when nothing else matches. -->
+    <bpmn:sequenceFlow id="flow_gateway_endRejected" name="Rejected" sourceRef="approvalGateway" targetRef="endRejected" />
     <bpmn:sequenceFlow id="flow_hrProcessing_endApproved" sourceRef="hrProcessing" targetRef="endApproved" />
 
   </bpmn:process>
@@ -70,7 +72,7 @@
       <bpmndi:BPMNShape id="start_di" bpmnElement="start">
         <dc:Bounds x="140" y="242" width="36" height="36" />
         <bpmndi:BPMNLabel>
-          <dc:Bounds x="115" y="294" width="86" height="27" />
+          <dc:Bounds x="115" y="284" width="86" height="27" />
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
 
@@ -81,7 +83,7 @@
       <bpmndi:BPMNShape id="managerReviewTimer_di" bpmnElement="managerReviewTimer">
         <dc:Bounds x="312" y="282" width="36" height="36" />
         <bpmndi:BPMNLabel>
-          <dc:Bounds x="374" y="292" width="80" height="14" />
+          <dc:Bounds x="345" y="381" width="90" height="14" />
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
 
@@ -92,7 +94,7 @@
       <bpmndi:BPMNShape id="approvalGateway_di" bpmnElement="approvalGateway" isMarkerVisible="true">
         <dc:Bounds x="500" y="235" width="50" height="50" />
         <bpmndi:BPMNLabel>
-          <dc:Bounds x="490" y="206" width="70" height="14" />
+          <dc:Bounds x="490" y="210" width="70" height="14" />
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
 
@@ -103,14 +105,14 @@
       <bpmndi:BPMNShape id="endApproved_di" bpmnElement="endApproved">
         <dc:Bounds x="862" y="242" width="36" height="36" />
         <bpmndi:BPMNLabel>
-          <dc:Bounds x="827" y="294" width="106" height="14" />
+          <dc:Bounds x="827" y="284" width="106" height="14" />
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
 
       <bpmndi:BPMNShape id="endRejected_di" bpmnElement="endRejected">
         <dc:Bounds x="507" y="500" width="36" height="36" />
         <bpmndi:BPMNLabel>
-          <dc:Bounds x="472" y="552" width="106" height="14" />
+          <dc:Bounds x="472" y="542" width="106" height="14" />
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
 
@@ -139,7 +141,7 @@
         <di:waypoint x="550" y="260" />
         <di:waypoint x="660" y="260" />
         <bpmndi:BPMNLabel>
-          <dc:Bounds x="583" y="236" width="54" height="14" />
+          <dc:Bounds x="578" y="232" width="54" height="14" />
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNEdge>
 
@@ -147,7 +149,7 @@
         <di:waypoint x="525" y="285" />
         <di:waypoint x="525" y="500" />
         <bpmndi:BPMNLabel>
-          <dc:Bounds x="537" y="390" width="52" height="14" />
+          <dc:Bounds x="537" y="384" width="52" height="14" />
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNEdge>
 

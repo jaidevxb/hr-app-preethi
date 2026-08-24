@@ -1,85 +1,18 @@
-import type { WorkflowDefinition } from "./types.js";
+import bpmnXml from "./leaveRequestWorkflow.bpmn?raw";
+import { parseBpmn, type BpmnProcess } from "./bpmnParser.js";
 
 /**
- * Leave Request Approval — BPMN flow:
+ * The Leave Request process, loaded from the BPMN 2.0 XML at build time.
  *
- *  (Start: Request Submitted)
- *        |
- *  [User Task: Manager Review]  --- boundary Timer (SLA) --> [User Task: Escalated Review]
- *        |                                                          |
- *  [Gateway: Approved?]  <---------------------------- (approve/reject) --+
- *     |approved            |rejected
- *     v                    v
- *  [User Task: HR          (End: Rejected)
- *   Processes Leave]
- *     |
- *  (End: Approved)
+ * There is no hand-written copy of this process any more: the flow, the
+ * assignees, the 3-day SLA and every diagram coordinate come out of
+ * leaveRequestWorkflow.bpmn. Edit that file in Camunda Modeler or bpmn.io and
+ * both the engine and the on-screen diagram follow.
+ *
+ * (The `?raw` import is Vite-only; the CLI reads the same file with `fs` —
+ * see src/cli.ts.)
  */
-export const leaveRequestWorkflow: WorkflowDefinition = {
-  id: "leave-request-approval",
-  name: "Leave Request Approval",
-  startNodeId: "start",
-  nodes: {
-    start: {
-      id: "start",
-      type: "startEvent",
-      name: "Request Submitted",
-      next: "managerReview",
-    },
-    managerReview: {
-      id: "managerReview",
-      type: "userTask",
-      name: "Manager Review",
-      assignee: "Manager",
-      next: "approvalGateway",
-      timer: {
-        durationMs: 3 * 24 * 60 * 60 * 1000, // 3 days SLA
-        next: "escalatedReview",
-      },
-    },
-    escalatedReview: {
-      id: "escalatedReview",
-      type: "userTask",
-      name: "Escalated Review (Skip-Level)",
-      assignee: "Skip-level Manager",
-      next: "approvalGateway",
-    },
-    approvalGateway: {
-      id: "approvalGateway",
-      type: "exclusiveGateway",
-      name: "Approved?",
-      branches: [
-        {
-          label: "Approved",
-          condition: (ctx) => ctx.decision === "approved",
-          next: "hrProcessing",
-        },
-        {
-          label: "Rejected",
-          condition: (ctx) => ctx.decision === "rejected",
-          next: "endRejected",
-        },
-      ],
-      default: "endRejected",
-    },
-    hrProcessing: {
-      id: "hrProcessing",
-      type: "userTask",
-      name: "HR Processes Leave",
-      assignee: "HR",
-      next: "endApproved",
-    },
-    endApproved: {
-      id: "endApproved",
-      type: "endEvent",
-      name: "Leave Approved",
-      outcome: "approved",
-    },
-    endRejected: {
-      id: "endRejected",
-      type: "endEvent",
-      name: "Leave Rejected",
-      outcome: "rejected",
-    },
-  },
-};
+export const leaveRequestProcess: BpmnProcess = parseBpmn(bpmnXml);
+
+export const leaveRequestWorkflow = leaveRequestProcess.definition;
+export const leaveRequestLayout = leaveRequestProcess.layout;

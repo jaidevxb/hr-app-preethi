@@ -3,10 +3,12 @@ import { LogTimeline } from "../components/LogTimeline.js";
 import { ProcessDiagram } from "../components/ProcessDiagram.js";
 import { RequestForm } from "../components/RequestForm.js";
 import { useWorkflowInstance } from "../hooks/useWorkflowInstance.js";
-import { leaveRequestWorkflow } from "../workflow/leaveRequestWorkflow.js";
+import { leaveRequestProcess } from "../workflow/leaveRequestWorkflow.js";
 
 export function WorkflowPage() {
-  const { instance, submit, completeTask, fireTimer, reset } = useWorkflowInstance(leaveRequestWorkflow);
+  const { instance, submit, completeTask, fireTimer, reset } = useWorkflowInstance(
+    leaveRequestProcess.definition
+  );
 
   const status = instance?.getStatus();
   const node = instance?.getCurrentNode();
@@ -14,7 +16,7 @@ export function WorkflowPage() {
 
   return (
     <div className="page">
-      <ProcessDiagram instance={instance} />
+      <ProcessDiagram process={leaveRequestProcess} instance={instance} />
 
       {!instance && <RequestForm onSubmit={submit} />}
 

@@ -1,6 +1,13 @@
+import { readFileSync } from "node:fs";
 import { createInterface } from "node:readline";
+import { parseBpmn } from "./workflow/bpmnParser.js";
 import { WorkflowInstance } from "./workflow/engine.js";
-import { leaveRequestWorkflow } from "./workflow/leaveRequestWorkflow.js";
+
+// The web build imports the .bpmn through Vite's `?raw`; under plain Node we
+// read the same file off disk. Either way the process comes from the XML.
+const { definition: leaveRequestWorkflow } = parseBpmn(
+  readFileSync(new URL("./workflow/leaveRequestWorkflow.bpmn", import.meta.url), "utf8")
+);
 
 const rl = createInterface({ input: process.stdin, output: process.stdout });
 const lines = rl[Symbol.asyncIterator]();
@@ -39,7 +46,12 @@ async function main() {
 
     console.log(`\n>> Current task: "${node.name}" (assignee: ${node.assignee})`);
 
-    if (node.id === "managerReview" || node.id === "escalatedReview") {
+    // A task that feeds an exclusive gateway is a decision — ask for one.
+    // Anything else just needs acknowledging. Both facts come from the parsed
+    // process rather than from hardcoded node ids.
+    const nextNode = leaveRequestWorkflow.nodes[node.next];
+
+    if (nextNode?.type === "exclusiveGateway") {
       const hasTimer = !!node.timer;
       const prompt = hasTimer
         ? "Decision — [a]pprove / [r]eject / [t]imer expires (escalate): "
@@ -55,13 +67,6 @@ async function main() {
       continue;
     }
 
-    if (node.id === "hrProcessing") {
-      await ask("Press Enter once HR has processed the leave...");
-      instance.completeTask({});
-      continue;
-    }
-
-    // Fallback for any future user tasks: just complete with no data.
     await ask(`Press Enter to complete "${node.name}"...`);
     instance.completeTask({});
   }

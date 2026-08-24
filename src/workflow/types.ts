@@ -34,6 +34,10 @@ export interface UserTaskNode extends BaseNode {
   assignee: string;
   next: NodeId;
   timer?: {
+    /** Id of the boundary event element itself — it has its own diagram shape. */
+    sourceId: NodeId;
+    /** The boundary event's name, e.g. "3-day SLA". */
+    label?: string;
     durationMs: number;
     next: NodeId; // where the boundary timer escalation flow goes
   };
