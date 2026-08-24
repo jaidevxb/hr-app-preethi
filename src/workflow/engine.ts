@@ -35,6 +35,17 @@ export interface ServiceTaskResult {
 export type ServiceHandler = (ctx: WorkflowContext) => ServiceTaskResult | void;
 export type ServiceHandlers = Record<string, ServiceHandler>;
 
+/** A boundary timer counting down on a task the process is currently waiting at. */
+export interface ArmedTimer {
+  tokenId: string;
+  nodeId: NodeId;
+  nodeName: string;
+  label?: string;
+  /** Deadline, on whatever clock the instance was given. */
+  dueAt: number;
+  remainingMs: number;
+}
+
 /** Runaway guard: a cyclic definition with no user task would spin forever. */
 const MAX_STEPS = 10_000;
 
@@ -57,15 +68,24 @@ export class WorkflowInstance {
   private queue: string[] = [];
   private nextTokenNumber = 1;
   private status: InstanceStatus = "waiting";
+  /** tokenId -> deadline, for tokens parked on a task with a boundary timer. */
+  private readonly timers = new Map<string, number>();
+  private readonly now: () => number;
 
   constructor(
     definition: WorkflowDefinition,
     initialContext: WorkflowContext = {},
-    handlers: ServiceHandlers = {}
+    handlers: ServiceHandlers = {},
+    /**
+     * Clock the boundary timers count against. Defaults to wall time; the UI
+     * passes a simulation clock so a 3-day SLA can expire in a few seconds.
+     */
+    now: () => number = Date.now
   ) {
     this.definition = definition;
     this.handlers = handlers;
     this.context = { ...initialContext };
+    this.now = now;
   }
 
   getStatus(): InstanceStatus {
@@ -104,6 +124,49 @@ export class WorkflowInstance {
     return [...this.reachedEnds];
   }
 
+  /** Boundary timers currently counting down, with time left on the clock. */
+  getArmedTimers(): ArmedTimer[] {
+    const now = this.now();
+    const armed: ArmedTimer[] = [];
+
+    for (const [tokenId, dueAt] of this.timers) {
+      const token = this.tokens.find((candidate) => candidate.id === tokenId);
+      if (!token) continue;
+      const node = this.node(token.nodeId);
+      if (node.type !== "userTask" || !node.timer) continue;
+
+      armed.push({
+        tokenId,
+        nodeId: node.id,
+        nodeName: node.name,
+        label: node.timer.label,
+        dueAt,
+        remainingMs: Math.max(0, dueAt - now),
+      });
+    }
+    return armed;
+  }
+
+  /**
+   * Fire every boundary timer whose deadline has passed. Returns the tokens
+   * that escalated, so a caller driving a clock knows whether anything moved.
+   */
+  tick(): string[] {
+    const now = this.now();
+    const due = [...this.timers.entries()]
+      .filter(([, dueAt]) => dueAt <= now)
+      .map(([tokenId]) => tokenId);
+
+    const fired: string[] = [];
+    for (const tokenId of due) {
+      // Firing one runs the engine, which can consume or re-arm others.
+      if (!this.timers.has(tokenId)) continue;
+      this.fireTimer(tokenId);
+      fired.push(tokenId);
+    }
+    return fired;
+  }
+
   /** Begin execution: place a token on the start event and run until blocked. */
   start(): void {
     if (this.log.length > 0) throw new Error("Workflow instance has already been started");
@@ -123,6 +186,7 @@ export class WorkflowInstance {
   completeTask(tokenId: string, outcome: WorkflowContext = {}): void {
     const { token, node } = this.requireWaitingUserTask(tokenId);
     this.context = { ...this.context, ...outcome };
+    this.timers.delete(tokenId);
     this.record(node, `Task completed by ${node.assignee}`, token);
     this.moveToken(token, node.next);
     this.run();
@@ -137,6 +201,7 @@ export class WorkflowInstance {
     if (!node.timer) {
       throw new Error(`Task "${node.name}" has no boundary timer event`);
     }
+    this.timers.delete(tokenId);
     this.record(node, "Boundary timer fired (SLA exceeded), escalating", token);
     this.moveToken(token, node.timer.next);
     this.run();
@@ -182,7 +247,9 @@ export class WorkflowInstance {
     }
 
     if (node.type === "userTask") {
-      // The token parks here; it isn't requeued until a person acts.
+      // The token parks here; it isn't requeued until a person acts (or the
+      // boundary timer runs out).
+      if (node.timer) this.timers.set(token.id, this.now() + node.timer.durationMs);
       this.record(node, `Waiting on ${node.assignee}${node.timer ? " (timer armed)" : ""}`, token);
       return;
     }
@@ -278,6 +345,7 @@ export class WorkflowInstance {
 
   private consume(token: Token): void {
     this.tokens = this.tokens.filter((candidate) => candidate.id !== token.id);
+    this.timers.delete(token.id);
   }
 
   private node(id: NodeId): WorkflowNode {

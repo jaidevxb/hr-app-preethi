@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { ActionPanel } from "../components/ActionPanel.js";
+import { ClockPanel } from "../components/ClockPanel.js";
 import { LogTimeline } from "../components/LogTimeline.js";
 import { ProcessDiagram } from "../components/ProcessDiagram.js";
 import { RequestForm } from "../components/RequestForm.js";
 import { useWorkflowInstance } from "../hooks/useWorkflowInstance.js";
 import { handlers } from "../workflow/handlers.js";
 import { DEFAULT_PROCESS_ID, findProcess, processLibrary } from "../workflow/processes/index.js";
+import { CLOCK_SPEEDS, DEFAULT_SPEED_ID } from "../workflow/simulationClock.js";
 import type { StartEventNode } from "../workflow/types.js";
 
 /** Values the engine set itself aren't worth echoing back as "you entered". */
@@ -15,19 +17,27 @@ function contextEntries(context: Record<string, unknown>) {
 
 export function WorkflowPage() {
   const [processId, setProcessId] = useState(DEFAULT_PROCESS_ID);
+  const [speedId, setSpeedId] = useState(DEFAULT_SPEED_ID);
   const process = findProcess(processId);
   const { definition } = process;
 
-  const { instance, submit, completeTask, fireTimer, reset } = useWorkflowInstance(
+  const { instance, elapsedSimMs, submit, completeTask, fireTimer, reset } = useWorkflowInstance(
     definition,
-    handlers
+    handlers,
+    speedId
   );
 
   const status = instance?.getStatus();
   const context = instance?.getContext() ?? {};
   const activeTasks = instance?.getActiveTasks() ?? [];
+  const armedTimers = instance?.getArmedTimers() ?? [];
   const outcome = status === "completed" ? instance?.getEndEvents()[0] : undefined;
   const start = definition.nodes[definition.startNodeId] as StartEventNode;
+
+  const clockRunning =
+    (CLOCK_SPEEDS.find((speed) => speed.id === speedId)?.simMsPerRealSecond ?? 0) > 0;
+  const remainingFor = (tokenId: string) =>
+    armedTimers.find((timer) => timer.tokenId === tokenId)?.remainingMs;
 
   return (
     <div className="page">
@@ -67,11 +77,22 @@ export function WorkflowPage() {
         </p>
       )}
 
+      {instance && status === "waiting" && (
+        <ClockPanel
+          speedId={speedId}
+          onSpeedChange={setSpeedId}
+          elapsedSimMs={elapsedSimMs}
+          armedTimers={armedTimers}
+          running={clockRunning}
+        />
+      )}
+
       {activeTasks.map(({ tokenId, node }) => (
         <ActionPanel
           key={tokenId}
           node={node}
           isDecision={definition.nodes[node.next]?.type === "exclusiveGateway"}
+          remainingMs={remainingFor(tokenId)}
           onApprove={() => completeTask(tokenId, { decision: "approved" })}
           onReject={() => completeTask(tokenId, { decision: "rejected" })}
           onFireTimer={() => fireTimer(tokenId)}

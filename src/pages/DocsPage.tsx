@@ -83,6 +83,11 @@ const SHIPPED = [
       "Start forms are declared in the file as camunda:formData — field ids, labels, types, defaults, enum choices. The UI renders whatever the process asks for and the CLI prompts for the same fields, so a new process gets working inputs without touching a component.",
   },
   {
+    title: "Boundary timers that run out on their own",
+    detail:
+      "A 3-day SLA isn't something you can wait out in a demo, so the timers count against a compressed clock — one simulated day per second or two, adjustable, pausable. Everything else about the timer is real: the engine arms it when a token parks on the task, the deadline is the P3D from the file, and it fires and escalates by itself while you watch the diagram. The manual “simulate timer expiry” button is still there for impatience.",
+  },
+  {
     title: "A custom-drawn diagram, not the stock renderer",
     detail:
       "The in-app diagram (this one) is hand-rendered SVG instead of bpmn-js's default output — bpmn-js paints everything via inline styles built for a white canvas, which fought every attempt to retheme it into this app's dark/light palette. It now reads its geometry from the file's own BPMNDI section, so it stays a faithful view of the same diagram Camunda Modeler would draw — with full control over the visuals.",
@@ -90,11 +95,6 @@ const SHIPPED = [
 ];
 
 const ROADMAP = [
-  {
-    title: "Real timers on an accelerated clock",
-    detail:
-      "Replace the “simulate timer expiry” button with a genuine scheduled timer running on a compressed clock — one simulated day per couple of seconds — so the escalation can be watched firing on the diagram instead of triggered by hand. This is the most simulator-ish thing left undone.",
-  },
   {
     title: "Replay and step-through",
     detail:
@@ -255,7 +255,9 @@ export function DocsPage() {
         <ul>
           <li>Three processes in the library; adding a fourth is adding a .bpmn file to the folder</li>
           <li>One in-memory instance at a time — nothing persists across a page refresh or a new CLI run</li>
-          <li>The 3-day SLA timer is simulated with a button, not a real clock</li>
+          <li>
+            The SLA timer runs on a compressed simulation clock, not wall time — and only while the tab is open
+          </li>
           <li>Start forms come from the file; per-task forms don't exist yet</li>
           <li>
             A deadlocked join (a token waiting on a branch that can't arrive) is detected and reported, but nothing

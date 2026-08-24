@@ -604,6 +604,77 @@ form > .btn-block {
   }
 }
 
+/* Simulation clock */
+.clock-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.clock-elapsed {
+  margin: 0.3rem 0 0;
+  font-size: 0.85rem;
+  font-family: var(--font-mono);
+}
+
+.clock-speed {
+  display: block;
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.clock-speed select {
+  width: auto;
+  min-width: 8rem;
+  padding: 0.45rem 0.6rem;
+  font-size: 0.85rem;
+}
+
+.clock-idle {
+  margin: 0.85rem 0 0;
+  font-size: 0.8rem;
+}
+
+.timer-list {
+  list-style: none;
+  margin: 0.9rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.timer-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  padding: 0.5rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--field-bg);
+  font-size: 0.83rem;
+}
+
+.timer-row--due {
+  border-color: var(--danger);
+}
+
+.timer-node {
+  font-weight: 600;
+}
+
+.timer-remaining {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--accent);
+  white-space: nowrap;
+}
+
 /* Shown above the task cards when a parallel split leaves several waiting */
 .parallel-note {
   margin: 0;

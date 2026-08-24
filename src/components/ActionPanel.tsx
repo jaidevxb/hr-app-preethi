@@ -1,3 +1,4 @@
+import { formatDuration } from "../workflow/simulationClock.js";
 import type { UserTaskNode } from "../workflow/types.js";
 
 const HOUR_MS = 60 * 60 * 1000;
@@ -13,6 +14,7 @@ function formatSla(durationMs: number): string {
 export function ActionPanel({
   node,
   isDecision,
+  remainingMs,
   onApprove,
   onReject,
   onFireTimer,
@@ -21,6 +23,8 @@ export function ActionPanel({
   node: UserTaskNode;
   /** True when this task feeds an exclusive gateway, i.e. it decides something. */
   isDecision: boolean;
+  /** Time left on this task's boundary timer, on the simulation clock. */
+  remainingMs?: number;
   onApprove: () => void;
   onReject: () => void;
   onFireTimer: () => void;
@@ -32,7 +36,8 @@ export function ActionPanel({
         <span className="badge">User Task</span>
         {node.timer && (
           <span className="badge badge-timer">
-            ⏱ {node.timer.label ?? formatSla(node.timer.durationMs)} armed
+            ⏱ {node.timer.label ?? formatSla(node.timer.durationMs)}
+            {remainingMs === undefined ? " armed" : ` — ${formatDuration(remainingMs)} left`}
           </span>
         )}
       </div>

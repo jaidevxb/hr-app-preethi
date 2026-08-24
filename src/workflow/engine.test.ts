@@ -112,6 +112,50 @@ describe("parallel gateways", () => {
   });
 });
 
+describe("boundary timers on a clock", () => {
+  const DAY = 24 * 60 * 60 * 1000;
+
+  /** An instance whose timers count against a clock the test controls. */
+  function withClock() {
+    let simTime = 0;
+    const wf = new WorkflowInstance(leaveRequestWorkflow, { days: "4" }, handlers, () => simTime);
+    wf.start();
+    return { wf, set: (ms: number) => (simTime = ms) };
+  }
+
+  it("arms the SLA from the file when a token parks on the task", () => {
+    const { wf } = withClock();
+    const [timer] = wf.getArmedTimers();
+
+    expect(timer).toMatchObject({ nodeId: "managerReview", label: "3-day SLA" });
+    expect(timer.remainingMs).toBe(3 * DAY);
+  });
+
+  it("counts down and fires on its own once the deadline passes", () => {
+    const { wf, set } = withClock();
+
+    set(2 * DAY);
+    expect(wf.tick()).toEqual([]);
+    expect(wf.getArmedTimers()[0].remainingMs).toBe(DAY);
+
+    set(3 * DAY);
+    expect(wf.tick()).toHaveLength(1);
+    expect(wf.getActiveTasks()[0].node.id).toBe("escalatedReview");
+    // The escalation task carries no timer of its own.
+    expect(wf.getArmedTimers()).toEqual([]);
+  });
+
+  it("disarms the timer when the task is completed in time", () => {
+    const { wf, set } = withClock();
+    wf.completeTask(wf.getActiveTasks()[0].tokenId, { decision: "approved" });
+
+    expect(wf.getArmedTimers()).toEqual([]);
+    set(10 * DAY);
+    expect(wf.tick()).toEqual([]);
+    expect(wf.getActiveTasks()[0].node.id).toBe("hrProcessing");
+  });
+});
+
 describe("service tasks", () => {
   it("runs the registered handler and merges its result into the context", () => {
     const wf = newInstance({ days: "4" });

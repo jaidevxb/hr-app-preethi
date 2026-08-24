@@ -48,8 +48,12 @@ React/Vite web UI with a full in-app Docs page — what/why/roadmap.
 
 Elements understood by the engine: Start/End Events, User Tasks, Service
 Tasks, Business Rule Tasks, Exclusive (Decision) Gateways, Parallel (AND)
-Gateways as both split and join, and boundary Timer Events (fired by hand via
-`fireTimer()` rather than a real clock — see the roadmap).
+Gateways as both split and join, and boundary Timer Events.
+
+The timers run on a **compressed simulation clock** — one simulated day per
+second or two, adjustable and pausable — so a 3-day SLA can actually be
+watched running out and escalating. The deadline itself is the `P3D` from the
+file; only the clock is sped up.
 
 ## Run it
 
@@ -70,6 +74,7 @@ npm run typecheck  # type-check everything (tsc, no emit)
 - `src/workflow/conditionExpression.ts` — tiny, deliberately limited evaluator for gateway conditions (no `eval`)
 - `src/workflow/engine.ts` — the token-based `WorkflowInstance` engine (start, completeTask, fireTimer)
 - `src/workflow/handlers.ts` — the code behind each `camunda:topic`, kept out of the process definitions
+- `src/workflow/simulationClock.ts` — the compressed clock boundary timers count against
 - `src/workflow/types.ts` — generic BPMN-ish node/definition types
 - `src/cli.ts` — interactive terminal driver
 - `src/hooks/useWorkflowInstance.ts` — React wrapper around the engine
@@ -82,8 +87,10 @@ full roadmap — that content isn't duplicated here.
 
 ## Next steps (not built yet)
 
-See the Roadmap section on the in-app Docs page. Short version: real timers on
-a compressed clock so escalations can be watched firing, step-through replay
-of a finished instance, a validation panel, more BPMN element types, and
-eventually diagram authoring plus a real BPMN engine (Camunda/Zeebe) behind
-the same interface.
+See the Roadmap section on the in-app Docs page. Short version: step-through
+replay of a finished instance, a validation panel, more BPMN element types
+(inclusive gateways, message events, sub-processes), and eventually diagram
+authoring plus a real BPMN engine (Camunda/Zeebe) behind the same interface.
+
+Explicit non-goals, since this is a simulator: auth, a database, a dashboard
+of concurrent instances, notifications.
