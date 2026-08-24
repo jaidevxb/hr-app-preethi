@@ -19,17 +19,24 @@ React/Vite web UI with a full in-app Docs page — what/why/roadmap.
       |
 [User Task: Manager Review] --boundary Timer (3d SLA)--> [User Task: Escalated Review]
       |                                                          |
-      +-------------------------- [Gateway: Approved?] <---------+
+      +-------------------------- [X Gateway: Approved?] <-------+
              |approved                    |rejected
              v                            v
-[User Task: HR Processes Leave]      (End: Rejected)
-      |
-(End: Approved)
+       [+ Split]                     (End: Rejected)
+        |      |
+        |      +--> [Service Task: Update Leave Balance] --+
+        |                                                  |
+        +--------> [User Task: HR Processes Leave] --------+
+                                                           v
+                                                       [+ Join]
+                                                           |
+                                                    (End: Approved)
 ```
 
-Elements demonstrated: Start/End Events, User Tasks, an Exclusive (Decision)
-Gateway, and a boundary Timer Event (simulated via a `fireTimer()` call
-instead of a real clock, since this is v1).
+Elements demonstrated: Start/End Events, User Tasks, a Service Task, an
+Exclusive (Decision) Gateway, a Parallel (AND) Gateway used as both split and
+join, and a boundary Timer Event (simulated via a `fireTimer()` call instead
+of a real clock, since this is v1).
 
 ## Run it
 

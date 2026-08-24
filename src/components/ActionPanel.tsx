@@ -12,19 +12,20 @@ function formatSla(durationMs: number): string {
 
 export function ActionPanel({
   node,
+  isDecision,
   onApprove,
   onReject,
   onFireTimer,
-  onMarkProcessed,
+  onComplete,
 }: {
   node: UserTaskNode;
+  /** True when this task feeds an exclusive gateway, i.e. it decides something. */
+  isDecision: boolean;
   onApprove: () => void;
   onReject: () => void;
   onFireTimer: () => void;
-  onMarkProcessed: () => void;
+  onComplete: () => void;
 }) {
-  const isReviewTask = node.id === "managerReview" || node.id === "escalatedReview";
-
   return (
     <div className="card">
       <div className="task-header">
@@ -38,7 +39,7 @@ export function ActionPanel({
       <h2>{node.name}</h2>
       <p className="muted">Waiting on: {node.assignee}</p>
 
-      {isReviewTask ? (
+      {isDecision ? (
         <div className="btn-row">
           <button className="btn btn-primary" onClick={onApprove}>
             Approve
@@ -54,7 +55,7 @@ export function ActionPanel({
         </div>
       ) : (
         <div className="btn-row">
-          <button className="btn btn-primary" onClick={onMarkProcessed}>
+          <button className="btn btn-primary" onClick={onComplete}>
             Mark processed
           </button>
         </div>

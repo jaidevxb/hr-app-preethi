@@ -1,9 +1,12 @@
 import { XMLParser } from "fast-xml-parser";
 import { parseCondition } from "./conditionExpression.js";
 import type {
+  BusinessRuleTaskNode,
   EndEventNode,
   ExclusiveGatewayNode,
   NodeId,
+  ParallelGatewayNode,
+  ServiceTaskNode,
   StartEventNode,
   UserTaskNode,
   WorkflowDefinition,
@@ -24,7 +27,20 @@ import type {
 
 // ---------------------------------------------------------------- layout ----
 
-export type ShapeKind = "start" | "end" | "task" | "gateway" | "boundary";
+export type ShapeKind =
+  | "start"
+  | "end"
+  | "userTask"
+  | "serviceTask"
+  | "businessRuleTask"
+  | "exclusiveGateway"
+  | "parallelGateway"
+  | "boundary";
+
+/** Tasks are rounded rectangles that carry their label inside the shape. */
+export function isTaskKind(kind: ShapeKind): boolean {
+  return kind === "userTask" || kind === "serviceTask" || kind === "businessRuleTask";
+}
 
 export interface ShapeLabel {
   x: number;
@@ -265,10 +281,37 @@ function readNodes(
     add(node);
   }
 
+  for (const raw of toArray<XmlNode>(process.serviceTask)) {
+    add(readAutomatedTask<ServiceTaskNode>(raw, "serviceTask", "Service task", flows));
+  }
+
+  for (const raw of toArray<XmlNode>(process.businessRuleTask)) {
+    add(readAutomatedTask<BusinessRuleTaskNode>(raw, "businessRuleTask", "Business rule task", flows));
+  }
+
   for (const raw of toArray<XmlNode>(process.exclusiveGateway)) {
     const id = attr(raw, "id");
     if (!id) throw new BpmnParseError("<bpmn:exclusiveGateway> is missing an id");
     add(readGateway(raw, id, flows));
+  }
+
+  for (const raw of toArray<XmlNode>(process.parallelGateway)) {
+    const id = attr(raw, "id");
+    if (!id) throw new BpmnParseError("<bpmn:parallelGateway> is missing an id");
+
+    const outgoing = outgoingFlows(id, flows);
+    if (outgoing.length === 0) {
+      throw new BpmnParseError(`Parallel gateway "${id}" has no outgoing sequence flows`);
+    }
+    const node: ParallelGatewayNode = {
+      id,
+      type: "parallelGateway",
+      name: attr(raw, "name") ?? id,
+      // A join fires once every incoming flow has delivered a token.
+      joinCount: [...flows.values()].filter((flow) => flow.targetRef === id).length,
+      next: outgoing.map((flow) => flow.targetRef),
+    };
+    add(node);
   }
 
   for (const raw of toArray<XmlNode>(process.endEvent)) {
@@ -286,6 +329,31 @@ function readNodes(
   attachBoundaryTimers(process, nodes, flows);
   assertTargetsResolve(nodes);
   return nodes;
+}
+
+function readAutomatedTask<T extends ServiceTaskNode | BusinessRuleTaskNode>(
+  raw: XmlNode,
+  type: T["type"],
+  label: string,
+  flows: Map<string, SequenceFlow>
+): T {
+  const id = attr(raw, "id");
+  if (!id) throw new BpmnParseError(`<bpmn:${type}> is missing an id`);
+
+  // camunda:topic — the same attribute Camunda uses to route external tasks
+  // to a worker. Here it names an entry in the handler registry.
+  const topic = attr(raw, "topic");
+  if (!topic) {
+    throw new BpmnParseError(`${label} "${id}" needs a camunda:topic naming its handler`);
+  }
+
+  return {
+    id,
+    type,
+    name: attr(raw, "name") ?? id,
+    topic,
+    next: singleTarget(id, label, flows),
+  } as T;
 }
 
 function readGateway(
@@ -386,10 +454,24 @@ function assertTargetsResolve(nodes: Record<NodeId, WorkflowNode>): void {
   const exists = (id: NodeId) => Boolean(nodes[id]);
   for (const node of Object.values(nodes)) {
     const targets: NodeId[] = [];
-    if (node.type === "startEvent" || node.type === "userTask") targets.push(node.next);
-    if (node.type === "userTask" && node.timer) targets.push(node.timer.next);
-    if (node.type === "exclusiveGateway") {
-      targets.push(node.default, ...node.branches.map((branch) => branch.next));
+    switch (node.type) {
+      case "startEvent":
+      case "serviceTask":
+      case "businessRuleTask":
+        targets.push(node.next);
+        break;
+      case "userTask":
+        targets.push(node.next);
+        if (node.timer) targets.push(node.timer.next);
+        break;
+      case "exclusiveGateway":
+        targets.push(node.default, ...node.branches.map((branch) => branch.next));
+        break;
+      case "parallelGateway":
+        targets.push(...node.next);
+        break;
+      case "endEvent":
+        break;
     }
     for (const target of targets) {
       if (!exists(target)) {
@@ -445,7 +527,7 @@ function readShape(raw: XmlNode, nodes: Record<NodeId, WorkflowNode>): DiagramSh
       w,
       lines: wrap(name, w),
     };
-  } else if (shape.kind === "task") {
+  } else if (isTaskKind(shape.kind)) {
     // Tasks with no BPMNLabel carry their name centered inside the shape,
     // which is how every BPMN tool renders them.
     const lines = wrap(name, shape.w - TASK_LABEL_PADDING);
@@ -505,10 +587,8 @@ function shapeKindFor(id: NodeId, nodes: Record<NodeId, WorkflowNode>): ShapeKin
       return "start";
     case "endEvent":
       return "end";
-    case "userTask":
-      return "task";
-    case "exclusiveGateway":
-      return "gateway";
+    default:
+      return node.type;
   }
 }
 

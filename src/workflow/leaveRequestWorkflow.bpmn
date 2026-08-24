@@ -35,17 +35,36 @@
     <bpmn:exclusiveGateway id="approvalGateway" name="Approved?" default="flow_gateway_endRejected">
       <bpmn:incoming>flow_managerReview_gateway</bpmn:incoming>
       <bpmn:incoming>flow_escalatedReview_gateway</bpmn:incoming>
-      <bpmn:outgoing>flow_gateway_hrProcessing</bpmn:outgoing>
+      <bpmn:outgoing>flow_gateway_split</bpmn:outgoing>
       <bpmn:outgoing>flow_gateway_endRejected</bpmn:outgoing>
     </bpmn:exclusiveGateway>
 
+    <!-- Once approved, the paperwork and the balance adjustment happen at the
+         same time; the process only ends when both are done. -->
+    <bpmn:parallelGateway id="splitApproved" name="Parallel Split">
+      <bpmn:incoming>flow_gateway_split</bpmn:incoming>
+      <bpmn:outgoing>flow_split_hrProcessing</bpmn:outgoing>
+      <bpmn:outgoing>flow_split_updateBalance</bpmn:outgoing>
+    </bpmn:parallelGateway>
+
     <bpmn:userTask id="hrProcessing" name="HR Processes Leave" camunda:assignee="HR">
-      <bpmn:incoming>flow_gateway_hrProcessing</bpmn:incoming>
-      <bpmn:outgoing>flow_hrProcessing_endApproved</bpmn:outgoing>
+      <bpmn:incoming>flow_split_hrProcessing</bpmn:incoming>
+      <bpmn:outgoing>flow_hrProcessing_join</bpmn:outgoing>
     </bpmn:userTask>
 
+    <bpmn:serviceTask id="updateBalance" name="Update Leave Balance" camunda:topic="leave.updateBalance">
+      <bpmn:incoming>flow_split_updateBalance</bpmn:incoming>
+      <bpmn:outgoing>flow_updateBalance_join</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:parallelGateway id="joinApproved" name="Parallel Join">
+      <bpmn:incoming>flow_hrProcessing_join</bpmn:incoming>
+      <bpmn:incoming>flow_updateBalance_join</bpmn:incoming>
+      <bpmn:outgoing>flow_join_endApproved</bpmn:outgoing>
+    </bpmn:parallelGateway>
+
     <bpmn:endEvent id="endApproved" name="Leave Approved" hr:outcome="approved">
-      <bpmn:incoming>flow_hrProcessing_endApproved</bpmn:incoming>
+      <bpmn:incoming>flow_join_endApproved</bpmn:incoming>
     </bpmn:endEvent>
 
     <bpmn:endEvent id="endRejected" name="Leave Rejected" hr:outcome="rejected">
@@ -56,13 +75,17 @@
     <bpmn:sequenceFlow id="flow_managerReview_gateway" sourceRef="managerReview" targetRef="approvalGateway" />
     <bpmn:sequenceFlow id="flow_timer_escalatedReview" sourceRef="managerReviewTimer" targetRef="escalatedReview" />
     <bpmn:sequenceFlow id="flow_escalatedReview_gateway" sourceRef="escalatedReview" targetRef="approvalGateway" />
-    <bpmn:sequenceFlow id="flow_gateway_hrProcessing" name="Approved" sourceRef="approvalGateway" targetRef="hrProcessing">
+    <bpmn:sequenceFlow id="flow_gateway_split" name="Approved" sourceRef="approvalGateway" targetRef="splitApproved">
       <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">decision == "approved"</bpmn:conditionExpression>
     </bpmn:sequenceFlow>
     <!-- Default flow: per BPMN it carries no conditionExpression; the gateway's
          `default` attribute points here, so it is taken when nothing else matches. -->
     <bpmn:sequenceFlow id="flow_gateway_endRejected" name="Rejected" sourceRef="approvalGateway" targetRef="endRejected" />
-    <bpmn:sequenceFlow id="flow_hrProcessing_endApproved" sourceRef="hrProcessing" targetRef="endApproved" />
+    <bpmn:sequenceFlow id="flow_split_hrProcessing" sourceRef="splitApproved" targetRef="hrProcessing" />
+    <bpmn:sequenceFlow id="flow_split_updateBalance" sourceRef="splitApproved" targetRef="updateBalance" />
+    <bpmn:sequenceFlow id="flow_hrProcessing_join" sourceRef="hrProcessing" targetRef="joinApproved" />
+    <bpmn:sequenceFlow id="flow_updateBalance_join" sourceRef="updateBalance" targetRef="joinApproved" />
+    <bpmn:sequenceFlow id="flow_join_endApproved" sourceRef="joinApproved" targetRef="endApproved" />
 
   </bpmn:process>
 
@@ -98,14 +121,26 @@
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
 
+      <bpmndi:BPMNShape id="splitApproved_di" bpmnElement="splitApproved">
+        <dc:Bounds x="620" y="235" width="50" height="50" />
+      </bpmndi:BPMNShape>
+
       <bpmndi:BPMNShape id="hrProcessing_di" bpmnElement="hrProcessing">
-        <dc:Bounds x="660" y="220" width="120" height="80" />
+        <dc:Bounds x="710" y="170" width="120" height="80" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="updateBalance_di" bpmnElement="updateBalance">
+        <dc:Bounds x="710" y="290" width="120" height="80" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="joinApproved_di" bpmnElement="joinApproved">
+        <dc:Bounds x="870" y="235" width="50" height="50" />
       </bpmndi:BPMNShape>
 
       <bpmndi:BPMNShape id="endApproved_di" bpmnElement="endApproved">
-        <dc:Bounds x="862" y="242" width="36" height="36" />
+        <dc:Bounds x="960" y="242" width="36" height="36" />
         <bpmndi:BPMNLabel>
-          <dc:Bounds x="827" y="284" width="106" height="14" />
+          <dc:Bounds x="925" y="284" width="106" height="14" />
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
 
@@ -137,11 +172,11 @@
         <di:waypoint x="500" y="260" />
       </bpmndi:BPMNEdge>
 
-      <bpmndi:BPMNEdge id="flow_gateway_hrProcessing_di" bpmnElement="flow_gateway_hrProcessing">
+      <bpmndi:BPMNEdge id="flow_gateway_split_di" bpmnElement="flow_gateway_split">
         <di:waypoint x="550" y="260" />
-        <di:waypoint x="660" y="260" />
+        <di:waypoint x="620" y="260" />
         <bpmndi:BPMNLabel>
-          <dc:Bounds x="578" y="232" width="54" height="14" />
+          <dc:Bounds x="558" y="232" width="54" height="14" />
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNEdge>
 
@@ -153,9 +188,33 @@
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNEdge>
 
-      <bpmndi:BPMNEdge id="flow_hrProcessing_endApproved_di" bpmnElement="flow_hrProcessing_endApproved">
-        <di:waypoint x="780" y="260" />
-        <di:waypoint x="862" y="260" />
+      <bpmndi:BPMNEdge id="flow_split_hrProcessing_di" bpmnElement="flow_split_hrProcessing">
+        <di:waypoint x="645" y="235" />
+        <di:waypoint x="645" y="210" />
+        <di:waypoint x="710" y="210" />
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="flow_split_updateBalance_di" bpmnElement="flow_split_updateBalance">
+        <di:waypoint x="645" y="285" />
+        <di:waypoint x="645" y="330" />
+        <di:waypoint x="710" y="330" />
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="flow_hrProcessing_join_di" bpmnElement="flow_hrProcessing_join">
+        <di:waypoint x="830" y="210" />
+        <di:waypoint x="895" y="210" />
+        <di:waypoint x="895" y="235" />
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="flow_updateBalance_join_di" bpmnElement="flow_updateBalance_join">
+        <di:waypoint x="830" y="330" />
+        <di:waypoint x="895" y="330" />
+        <di:waypoint x="895" y="285" />
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="flow_join_endApproved_di" bpmnElement="flow_join_endApproved">
+        <di:waypoint x="920" y="260" />
+        <di:waypoint x="960" y="260" />
       </bpmndi:BPMNEdge>
 
     </bpmndi:BPMNPlane>

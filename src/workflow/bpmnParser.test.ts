@@ -15,7 +15,29 @@ describe("parseBpmn — process semantics", () => {
   it("wires sequence flows into next pointers", () => {
     expect(definition.nodes.start).toMatchObject({ type: "startEvent", next: "managerReview" });
     expect(definition.nodes.managerReview).toMatchObject({ next: "approvalGateway" });
-    expect(definition.nodes.hrProcessing).toMatchObject({ next: "endApproved" });
+    expect(definition.nodes.hrProcessing).toMatchObject({ next: "joinApproved" });
+  });
+
+  it("reads a parallel gateway's split targets and join arity", () => {
+    expect(definition.nodes.splitApproved).toMatchObject({
+      type: "parallelGateway",
+      joinCount: 1,
+      next: ["hrProcessing", "updateBalance"],
+    });
+    expect(definition.nodes.joinApproved).toMatchObject({
+      type: "parallelGateway",
+      joinCount: 2,
+      next: ["endApproved"],
+    });
+  });
+
+  it("reads a service task's handler topic", () => {
+    expect(definition.nodes.updateBalance).toMatchObject({
+      type: "serviceTask",
+      name: "Update Leave Balance",
+      topic: "leave.updateBalance",
+      next: "joinApproved",
+    });
   });
 
   it("reads assignees from camunda:assignee", () => {
@@ -51,6 +73,7 @@ describe("parseBpmn — process semantics", () => {
     if (gateway.type !== "exclusiveGateway") throw new Error("expected a gateway");
 
     expect(gateway.branches.map((branch) => branch.label)).toEqual(["Approved", "Rejected"]);
+    expect(gateway.branches.map((branch) => branch.next)).toEqual(["splitApproved", "endRejected"]);
     expect(gateway.default).toBe("endRejected");
 
     const [approved, rejected] = gateway.branches;
@@ -70,12 +93,20 @@ describe("parseBpmn — diagram layout", () => {
       "managerReviewTimer",
       "escalatedReview",
       "approvalGateway",
+      "splitApproved",
       "hrProcessing",
+      "updateBalance",
+      "joinApproved",
       "endApproved",
       "endRejected",
     ]);
-    expect(layout.shapes.find((shape) => shape.id === "managerReviewTimer")?.kind).toBe("boundary");
-    expect(layout.shapes.find((shape) => shape.id === "approvalGateway")?.kind).toBe("gateway");
+
+    const kindOf = (id: string) => layout.shapes.find((shape) => shape.id === id)?.kind;
+    expect(kindOf("managerReviewTimer")).toBe("boundary");
+    expect(kindOf("approvalGateway")).toBe("exclusiveGateway");
+    expect(kindOf("splitApproved")).toBe("parallelGateway");
+    expect(kindOf("hrProcessing")).toBe("userTask");
+    expect(kindOf("updateBalance")).toBe("serviceTask");
   });
 
   it("takes shape geometry straight from dc:Bounds", () => {
@@ -89,8 +120,11 @@ describe("parseBpmn — diagram layout", () => {
     expect(linesFor("managerReview")).toEqual(["Manager Review"]);
     expect(linesFor("escalatedReview")).toEqual(["Escalated Review", "(Skip-Level)"]);
     expect(linesFor("hrProcessing")).toEqual(["HR Processes", "Leave"]);
+    expect(linesFor("updateBalance")).toEqual(["Update Leave", "Balance"]);
     expect(linesFor("managerReviewTimer")).toEqual(["3-day SLA"]);
     expect(linesFor("endApproved")).toEqual(["Leave Approved"]);
+    // Unnamed elements (the parallel gateways) get no label at all.
+    expect(linesFor("splitApproved")).toBeUndefined();
   });
 
   it("reads edge waypoints and names conditional edges", () => {
@@ -101,8 +135,8 @@ describe("parseBpmn — diagram layout", () => {
       [500, 260],
     ]);
 
-    const approved = layout.edges.find((candidate) => candidate.id === "flow_gateway_hrProcessing");
-    expect(approved?.label).toEqual({ x: 605, y: 244, text: "Approved" });
+    const approved = layout.edges.find((candidate) => candidate.id === "flow_gateway_split");
+    expect(approved?.label).toEqual({ x: 585, y: 244, text: "Approved" });
 
     // No name on the flow means no label drawn.
     expect(layout.edges.find((candidate) => candidate.id === "flow_start_managerReview")?.label).toBeUndefined();
@@ -112,7 +146,7 @@ describe("parseBpmn — diagram layout", () => {
     const [x, y, width, height] = layout.viewBox.split(" ").map(Number);
     expect(x).toBeLessThanOrEqual(115); // leftmost label bounds
     expect(y).toBeLessThanOrEqual(210); // gateway label sits above the diamond
-    expect(x + width).toBeGreaterThanOrEqual(933); // right edge of the approved label
+    expect(x + width).toBeGreaterThanOrEqual(1031); // right edge of the approved label
     expect(y + height).toBeGreaterThanOrEqual(556); // bottom of the rejected label
   });
 });

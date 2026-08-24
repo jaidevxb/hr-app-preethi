@@ -12,10 +12,24 @@ const GLOSSARY = [
     here: '"Manager Review", "Escalated Review", "HR Processes Leave"',
   },
   {
+    icon: "⚙",
+    name: "Service Task",
+    meaning:
+      "A step the system performs by itself — no human involved. The file names a topic; the app supplies the code behind it.",
+    here: '"Update Leave Balance" — deducts the days from the employee\'s allowance',
+  },
+  {
     icon: "◇",
     name: "Exclusive Gateway",
     meaning: "A decision point — picks exactly one outgoing path based on data collected so far.",
     here: '"Approved?" branches to HR processing or straight to Rejected',
+  },
+  {
+    icon: "✛",
+    name: "Parallel Gateway",
+    meaning:
+      "An AND-split and AND-join. Splitting starts every outgoing path at once; joining waits until every incoming path has arrived before continuing.",
+    here: "After approval, HR's paperwork and the balance update run side by side and must both finish",
   },
   {
     icon: "⏱",
@@ -49,6 +63,16 @@ const SHIPPED = [
       'Conditions like decision == "approved" live in the file as BPMN conditionExpressions. Since the process definition is now data loaded at runtime, running it through eval() would be a real hole — so there is a deliberately tiny grammar (variable, operator, literal) that refuses anything it doesn\'t recognise. Real engines do the same thing with a proper expression language: JUEL in Camunda 7, FEEL in Zeebe.',
   },
   {
+    title: "A token-based engine, so parallel gateways actually work",
+    detail:
+      "The engine used to track a single current element, which is fine until two things need to happen at once. It now models execution with tokens the way BPMN specifies: an AND-split issues a token per outgoing flow, an AND-join holds them until every incoming flow has delivered one, and the process ends when no tokens remain. Approved leave now runs HR's paperwork and the balance update side by side.",
+  },
+  {
+    title: "Service tasks with a handler registry",
+    detail:
+      "Steps that run without a human. The BPMN file names a camunda:topic and the app registers the code behind it — the same split Camunda uses between a process and its external task workers, so the definition stays free of implementation.",
+  },
+  {
     title: "A custom-drawn diagram, not the stock renderer",
     detail:
       "The in-app diagram (this one) is hand-rendered SVG instead of bpmn-js's default output — bpmn-js paints everything via inline styles built for a white canvas, which fought every attempt to retheme it into this app's dark/light palette. It now reads its geometry from the file's own BPMNDI section, so it stays a faithful view of the same diagram Camunda Modeler would draw — with full control over the visuals.",
@@ -65,16 +89,6 @@ const ROADMAP = [
     title: "Forms described by the BPMN file",
     detail:
       "The request form is currently three hardcoded fields (name / days / reason). Camunda models form fields inside the XML; reading those would mean each process in the library brings its own form instead of borrowing the leave request's.",
-  },
-  {
-    title: "Parallel gateways — and the token model they force",
-    detail:
-      "An AND-split is the element that breaks this engine: it tracks a single current node, and a parallel branch needs several live at once. Doing it properly means moving to tokens, which is the actual line between a toy and an engine — and it's much cheaper to cross before instances get persisted or listed in a dashboard.",
-  },
-  {
-    title: "Service tasks and business rule tasks",
-    detail:
-      "Steps that run without a human — post to payroll, auto-approve anything under two days. Cheap to add once tasks can dispatch to registered handlers, and they make the activity log look like something actually happened.",
   },
   {
     title: "Real timers on an accelerated clock",
@@ -232,10 +246,10 @@ export function DocsPage() {
           <li>One in-memory instance at a time — nothing persists across a page refresh or a new CLI run</li>
           <li>The 3-day SLA timer is simulated with a button, not a real clock</li>
           <li>
-            Five BPMN element types are understood (start, user task, exclusive gateway, boundary timer, end);
-            anything else in a file is rejected rather than silently ignored
+            Eight BPMN element types are understood (start, user task, service task, business rule task, exclusive
+            gateway, parallel gateway, boundary timer, end); anything else in a file is rejected rather than
+            silently ignored
           </li>
-          <li>The engine tracks a single active element, so parallel gateways aren't possible yet</li>
           <li>The diagram is read-only — a renderer for this subset, not a general-purpose one</li>
           <li>The request form's fields are hardcoded, not read from the process</li>
           <li>No auth, no multi-user, no database, no notifications</li>

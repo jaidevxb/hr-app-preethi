@@ -466,6 +466,23 @@ form > .btn-block {
   stroke-width: 1.6;
 }
 
+/* Task-type icons (person / gear / table) in the top-left of a task shape.
+   Kept separate from .diagram-glyph so the "current" state doesn't thicken
+   them into blobs at this size. */
+.diagram-icon {
+  fill: none;
+  stroke: var(--muted);
+  stroke-width: 1.1;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: stroke 0.2s ease;
+}
+
+.diagram-node--visited .diagram-icon,
+.diagram-node--current .diagram-icon {
+  stroke: var(--accent);
+}
+
 .diagram-label {
   fill: var(--text);
   font-family: var(--font);
@@ -522,6 +539,16 @@ form > .btn-block {
   50% {
     filter: drop-shadow(0 0 5px var(--accent));
   }
+}
+
+/* Shown above the task cards when a parallel split leaves several waiting */
+.parallel-note {
+  margin: 0;
+  padding: 0.65rem 0.9rem;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  background: var(--field-bg);
+  font-size: 0.85rem;
 }
 
 /* Outcome banner */

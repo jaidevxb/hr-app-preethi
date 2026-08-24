@@ -1,28 +1,70 @@
+import { isAutomatedTask } from "./types.js";
 import type {
+  AutomatedTaskNode,
+  EndEventNode,
   LogEntry,
   NodeId,
+  ParallelGatewayNode,
+  UserTaskNode,
   WorkflowContext,
   WorkflowDefinition,
   WorkflowNode,
 } from "./types.js";
 
-export type InstanceStatus = "running" | "waitingOnTask" | "completed";
+export type InstanceStatus = "waiting" | "completed";
+
+/** A unit of execution sitting on one element. Parallel branches each get one. */
+export interface Token {
+  id: string;
+  nodeId: NodeId;
+}
+
+/** A user task with a live token on it — something a person can act on. */
+export interface ActiveTask {
+  tokenId: string;
+  node: UserTaskNode;
+}
+
+export interface ServiceTaskResult {
+  /** Values merged into the workflow context. */
+  context?: WorkflowContext;
+  /** What to write in the activity log; a default is used if omitted. */
+  message?: string;
+}
+
+export type ServiceHandler = (ctx: WorkflowContext) => ServiceTaskResult | void;
+export type ServiceHandlers = Record<string, ServiceHandler>;
+
+/** Runaway guard: a cyclic definition with no user task would spin forever. */
+const MAX_STEPS = 10_000;
 
 /**
- * Minimal BPMN-flavored workflow engine. Walks a WorkflowDefinition node by
- * node, auto-advancing through start events / gateways / end events, and
- * pausing at User Tasks until completeTask() or fireTimer() is called.
+ * Minimal BPMN-flavored workflow engine.
+ *
+ * Execution is modeled with tokens rather than a single cursor, which is what
+ * BPMN actually specifies and what parallel gateways require: an AND-split
+ * produces a token per outgoing flow, and an AND-join holds them until every
+ * incoming flow has delivered one. A process is complete when no tokens remain.
  */
 export class WorkflowInstance {
   private readonly definition: WorkflowDefinition;
-  private currentNodeId: NodeId;
+  private readonly handlers: ServiceHandlers;
   private context: WorkflowContext;
   private readonly log: LogEntry[] = [];
-  private status: InstanceStatus = "running";
+  private readonly reachedEnds: EndEventNode[] = [];
 
-  constructor(definition: WorkflowDefinition, initialContext: WorkflowContext = {}) {
+  private tokens: Token[] = [];
+  private queue: string[] = [];
+  private nextTokenNumber = 1;
+  private status: InstanceStatus = "waiting";
+
+  constructor(
+    definition: WorkflowDefinition,
+    initialContext: WorkflowContext = {},
+    handlers: ServiceHandlers = {}
+  ) {
     this.definition = definition;
-    this.currentNodeId = definition.startNodeId;
+    this.handlers = handlers;
     this.context = { ...initialContext };
   }
 
@@ -34,97 +76,208 @@ export class WorkflowInstance {
     return { ...this.context };
   }
 
-  getCurrentNode(): WorkflowNode {
-    return this.node(this.currentNodeId);
-  }
-
   getLog(): LogEntry[] {
     return [...this.log];
   }
 
-  /** Begin execution: process the start event and run until blocked or done. */
+  getTokens(): Token[] {
+    return this.tokens.map((token) => ({ ...token }));
+  }
+
+  /** Every element currently holding a token — user tasks and parked joins. */
+  getActiveNodeIds(): NodeId[] {
+    return [...new Set(this.tokens.map((token) => token.nodeId))];
+  }
+
+  /** The user tasks a person can act on right now. */
+  getActiveTasks(): ActiveTask[] {
+    const tasks: ActiveTask[] = [];
+    for (const token of this.tokens) {
+      const node = this.node(token.nodeId);
+      if (node.type === "userTask") tasks.push({ tokenId: token.id, node });
+    }
+    return tasks;
+  }
+
+  /** End events this instance reached, in the order they were reached. */
+  getEndEvents(): EndEventNode[] {
+    return [...this.reachedEnds];
+  }
+
+  /** Begin execution: place a token on the start event and run until blocked. */
   start(): void {
-    const node = this.node(this.currentNodeId);
+    if (this.log.length > 0) throw new Error("Workflow instance has already been started");
+    const node = this.node(this.definition.startNodeId);
     if (node.type !== "startEvent") {
       throw new Error(`Workflow must begin at a startEvent, got ${node.type}`);
     }
-    this.record(node, `Started workflow "${this.definition.name}"`);
-    this.moveTo(node.next);
-    this.advance();
+    const token = this.createToken(node.id);
+    this.queue.push(token.id);
+    this.run();
   }
 
   /**
-   * Complete the User Task currently being waited on. `outcome` is merged
+   * Complete the User Task the given token is waiting on. `outcome` is merged
    * into the workflow context so downstream gateways can branch on it.
    */
-  completeTask(outcome: WorkflowContext = {}): void {
-    const node = this.requireWaitingUserTask();
+  completeTask(tokenId: string, outcome: WorkflowContext = {}): void {
+    const { token, node } = this.requireWaitingUserTask(tokenId);
     this.context = { ...this.context, ...outcome };
-    this.record(node, `Task completed by ${node.assignee}`);
-    this.moveTo(node.next);
-    this.advance();
+    this.record(node, `Task completed by ${node.assignee}`, token);
+    this.moveToken(token, node.next);
+    this.run();
   }
 
   /**
-   * Simulate the boundary Timer Event on the current User Task firing
-   * (e.g. no response within the SLA), rerouting to its escalation path.
+   * Fire the boundary Timer Event on the task this token is waiting at (e.g.
+   * no response within the SLA), rerouting it down the escalation path.
    */
-  fireTimer(): void {
-    const node = this.requireWaitingUserTask();
+  fireTimer(tokenId: string): void {
+    const { token, node } = this.requireWaitingUserTask(tokenId);
     if (!node.timer) {
       throw new Error(`Task "${node.name}" has no boundary timer event`);
     }
-    this.record(node, `Boundary timer fired (SLA exceeded), escalating`);
-    this.moveTo(node.timer.next);
-    this.advance();
+    this.record(node, "Boundary timer fired (SLA exceeded), escalating", token);
+    this.moveToken(token, node.timer.next);
+    this.run();
   }
 
-  private requireWaitingUserTask() {
-    if (this.status !== "waitingOnTask") {
-      throw new Error(`No user task is currently waiting (status: ${this.status})`);
-    }
-    const node = this.node(this.currentNodeId);
+  private requireWaitingUserTask(tokenId: string): { token: Token; node: UserTaskNode } {
+    const token = this.tokens.find((candidate) => candidate.id === tokenId);
+    if (!token) throw new Error(`No active token "${tokenId}"`);
+
+    const node = this.node(token.nodeId);
     if (node.type !== "userTask") {
-      throw new Error(`Current node "${node.id}" is not a userTask`);
+      throw new Error(`Token "${tokenId}" is on "${node.id}", which is not a userTask`);
     }
-    return node;
+    return { token, node };
   }
 
-  /** Auto-advance through startEvent/gateway/endEvent nodes until blocked or done. */
-  private advance(): void {
-    for (;;) {
-      const node = this.node(this.currentNodeId);
+  // ------------------------------------------------------------ execution ---
 
-      if (node.type === "userTask") {
-        this.status = "waitingOnTask";
-        this.record(node, `Waiting on ${node.assignee}${node.timer ? " (timer armed)" : ""}`);
-        return;
+  /** Drain the queue: advance every token until each is parked or consumed. */
+  private run(): void {
+    let steps = 0;
+    while (this.queue.length > 0) {
+      if (++steps > MAX_STEPS) {
+        throw new Error(
+          `Workflow "${this.definition.id}" exceeded ${MAX_STEPS} steps — the definition probably has a cycle with no wait state`
+        );
       }
+      const tokenId = this.queue.shift()!;
+      const token = this.tokens.find((candidate) => candidate.id === tokenId);
+      if (!token) continue; // consumed by a join while it sat in the queue
+      this.step(token);
+    }
+    this.status = this.tokens.length === 0 ? "completed" : "waiting";
+  }
 
-      if (node.type === "endEvent") {
-        this.status = "completed";
-        this.record(node, `Workflow ended: ${node.outcome}`);
-        return;
-      }
+  private step(token: Token): void {
+    const node = this.node(token.nodeId);
 
-      if (node.type === "exclusiveGateway") {
-        const branch = node.branches.find((b) => b.condition(this.context));
-        const next = branch?.next ?? node.default;
+    if (node.type === "startEvent") {
+      this.record(node, `Started workflow "${this.definition.name}"`, token);
+      this.moveToken(token, node.next);
+      return;
+    }
+
+    if (node.type === "userTask") {
+      // The token parks here; it isn't requeued until a person acts.
+      this.record(node, `Waiting on ${node.assignee}${node.timer ? " (timer armed)" : ""}`, token);
+      return;
+    }
+
+    if (isAutomatedTask(node)) {
+      this.runAutomatedTask(node, token);
+      this.moveToken(token, node.next);
+      return;
+    }
+
+    if (node.type === "exclusiveGateway") {
+      const branch = node.branches.find((candidate) => candidate.condition(this.context));
+      const next = branch?.next ?? node.default;
+      this.record(
+        node,
+        branch ? `Branch "${branch.label}" taken` : "No branch matched, using default",
+        token
+      );
+      this.moveToken(token, next);
+      return;
+    }
+
+    if (node.type === "parallelGateway") {
+      this.stepParallelGateway(node, token);
+      return;
+    }
+
+    // endEvent — this token's path is finished.
+    this.record(node, `Workflow ended: ${node.outcome}`, token);
+    this.reachedEnds.push(node);
+    this.consume(token);
+  }
+
+  private stepParallelGateway(node: ParallelGatewayNode, token: Token): void {
+    if (node.joinCount > 1) {
+      const arrived = this.tokens.filter((candidate) => candidate.nodeId === node.id);
+      if (arrived.length < node.joinCount) {
+        // Park: this branch got here first and waits for its siblings.
         this.record(
           node,
-          branch ? `Branch "${branch.label}" taken` : "No branch matched, using default"
+          `Waiting to join (${arrived.length}/${node.joinCount} branches arrived)`,
+          token
         );
-        this.moveTo(next);
-        continue;
+        return;
       }
-
-      throw new Error(`Cannot auto-advance through node type "${node.type}"`);
+      // All in. Merge them back down to the one token we're holding.
+      for (const other of arrived) {
+        if (other.id !== token.id) this.consume(other);
+      }
+      this.record(node, `Joined ${node.joinCount} branches`, token);
     }
+
+    if (node.next.length === 0) {
+      throw new Error(`Parallel gateway "${node.id}" has no outgoing flow`);
+    }
+
+    if (node.next.length > 1) {
+      this.record(node, `Split into ${node.next.length} parallel branches`, token);
+      for (const target of node.next.slice(1)) {
+        const branch = this.createToken(target);
+        this.queue.push(branch.id);
+      }
+    }
+    this.moveToken(token, node.next[0]);
   }
 
-  private moveTo(nodeId: NodeId): void {
-    this.currentNodeId = nodeId;
-    this.status = "running";
+  private runAutomatedTask(node: AutomatedTaskNode, token: Token): void {
+    const handler = this.handlers[node.topic];
+    if (!handler) {
+      this.record(node, `No handler registered for "${node.topic}" — skipped`, token);
+      return;
+    }
+
+    const result = handler(this.getContext()) ?? {};
+    if (result.context) this.context = { ...this.context, ...result.context };
+
+    const kind = node.type === "businessRuleTask" ? "Rule evaluated" : "Service task ran";
+    this.record(node, result.message ?? `${kind} (${node.topic})`, token);
+  }
+
+  // --------------------------------------------------------------- tokens ---
+
+  private createToken(nodeId: NodeId): Token {
+    const token: Token = { id: `t${this.nextTokenNumber++}`, nodeId };
+    this.tokens.push(token);
+    return token;
+  }
+
+  private moveToken(token: Token, nodeId: NodeId): void {
+    token.nodeId = nodeId;
+    this.queue.push(token.id);
+  }
+
+  private consume(token: Token): void {
+    this.tokens = this.tokens.filter((candidate) => candidate.id !== token.id);
   }
 
   private node(id: NodeId): WorkflowNode {
@@ -133,7 +286,13 @@ export class WorkflowInstance {
     return node;
   }
 
-  private record(node: WorkflowNode, message: string): void {
-    this.log.push({ timestamp: new Date(), nodeId: node.id, nodeName: node.name, message });
+  private record(node: WorkflowNode, message: string, token?: Token): void {
+    this.log.push({
+      timestamp: new Date(),
+      nodeId: node.id,
+      nodeName: node.name,
+      message,
+      tokenId: token?.id,
+    });
   }
 }

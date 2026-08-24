@@ -3,16 +3,21 @@ import { LogTimeline } from "../components/LogTimeline.js";
 import { ProcessDiagram } from "../components/ProcessDiagram.js";
 import { RequestForm } from "../components/RequestForm.js";
 import { useWorkflowInstance } from "../hooks/useWorkflowInstance.js";
+import { handlers } from "../workflow/handlers.js";
 import { leaveRequestProcess } from "../workflow/leaveRequestWorkflow.js";
+
+const { definition } = leaveRequestProcess;
 
 export function WorkflowPage() {
   const { instance, submit, completeTask, fireTimer, reset } = useWorkflowInstance(
-    leaveRequestProcess.definition
+    definition,
+    handlers
   );
 
   const status = instance?.getStatus();
-  const node = instance?.getCurrentNode();
   const context = instance?.getContext();
+  const activeTasks = instance?.getActiveTasks() ?? [];
+  const outcome = status === "completed" ? instance?.getEndEvents()[0] : undefined;
 
   return (
     <div className="page">
@@ -20,22 +25,34 @@ export function WorkflowPage() {
 
       {!instance && <RequestForm onSubmit={submit} />}
 
-      {status === "waitingOnTask" && node?.type === "userTask" && (
-        <ActionPanel
-          node={node}
-          onApprove={() => completeTask({ decision: "approved" })}
-          onReject={() => completeTask({ decision: "rejected" })}
-          onFireTimer={fireTimer}
-          onMarkProcessed={() => completeTask({})}
-        />
+      {activeTasks.length > 1 && (
+        <p className="muted parallel-note">
+          {activeTasks.length} tasks are waiting at the same time — the process split into parallel
+          branches and won't finish until both are done.
+        </p>
       )}
 
-      {status === "completed" && node?.type === "endEvent" && (
-        <div className={`card outcome outcome-${node.outcome}`}>
-          <h2>{node.name}</h2>
+      {activeTasks.map(({ tokenId, node }) => (
+        <ActionPanel
+          key={tokenId}
+          node={node}
+          isDecision={definition.nodes[node.next]?.type === "exclusiveGateway"}
+          onApprove={() => completeTask(tokenId, { decision: "approved" })}
+          onReject={() => completeTask(tokenId, { decision: "rejected" })}
+          onFireTimer={() => fireTimer(tokenId)}
+          onComplete={() => completeTask(tokenId, {})}
+        />
+      ))}
+
+      {outcome && (
+        <div className={`card outcome outcome-${outcome.outcome}`}>
+          <h2>{outcome.name}</h2>
           <p className="muted">
             {String(context?.employeeName)} — {String(context?.days)} day(s) — {String(context?.reason)}
           </p>
+          {context?.leaveBalance !== undefined && (
+            <p className="muted">Leave balance now {String(context.leaveBalance)} day(s).</p>
+          )}
           <button className="btn btn-ghost" onClick={reset}>
             Start another request
           </button>

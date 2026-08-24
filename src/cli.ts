@@ -2,10 +2,11 @@ import { readFileSync } from "node:fs";
 import { createInterface } from "node:readline";
 import { parseBpmn } from "./workflow/bpmnParser.js";
 import { WorkflowInstance } from "./workflow/engine.js";
+import { handlers } from "./workflow/handlers.js";
 
 // The web build imports the .bpmn through Vite's `?raw`; under plain Node we
 // read the same file off disk. Either way the process comes from the XML.
-const { definition: leaveRequestWorkflow } = parseBpmn(
+const { definition } = parseBpmn(
   readFileSync(new URL("./workflow/leaveRequestWorkflow.bpmn", import.meta.url), "utf8")
 );
 
@@ -21,7 +22,8 @@ async function ask(promptText: string): Promise<string> {
 function printLog(instance: WorkflowInstance) {
   console.log("\n--- Workflow log ---");
   for (const entry of instance.getLog()) {
-    console.log(`[${entry.nodeName}] ${entry.message}`);
+    const token = entry.tokenId ? `${entry.tokenId} ` : "";
+    console.log(`${token}[${entry.nodeName}] ${entry.message}`);
   }
   console.log("--------------------\n");
 }
@@ -33,23 +35,30 @@ async function main() {
   const days = (await ask("Number of days: ")) || "1";
   const reason = (await ask("Reason: ")) || "Personal";
 
-  const instance = new WorkflowInstance(leaveRequestWorkflow, {
-    employeeName,
-    days,
-    reason,
-  });
+  const instance = new WorkflowInstance(definition, { employeeName, days, reason }, handlers);
   instance.start();
 
-  while (instance.getStatus() === "waitingOnTask") {
-    const node = instance.getCurrentNode();
-    if (node.type !== "userTask") break; // not reachable, but keeps TS happy
+  while (instance.getStatus() === "waiting") {
+    const tasks = instance.getActiveTasks();
+    if (tasks.length === 0) {
+      // Tokens remain but none are on a user task — a join is still waiting on
+      // a branch that can't arrive. Nothing a person can do about it here.
+      console.log("\n!! Deadlocked: tokens are parked at a join that will never complete.");
+      break;
+    }
 
+    if (tasks.length > 1) {
+      console.log(`\n(${tasks.length} tasks waiting in parallel — handling them in order)`);
+    }
+
+    // Take them one at a time; the list refreshes after each completion.
+    const { tokenId, node } = tasks[0];
     console.log(`\n>> Current task: "${node.name}" (assignee: ${node.assignee})`);
 
     // A task that feeds an exclusive gateway is a decision — ask for one.
     // Anything else just needs acknowledging. Both facts come from the parsed
     // process rather than from hardcoded node ids.
-    const nextNode = leaveRequestWorkflow.nodes[node.next];
+    const nextNode = definition.nodes[node.next];
 
     if (nextNode?.type === "exclusiveGateway") {
       const hasTimer = !!node.timer;
@@ -59,23 +68,22 @@ async function main() {
       const answer = ((await ask(prompt)) || "").trim().toLowerCase();
 
       if (hasTimer && answer.startsWith("t")) {
-        instance.fireTimer();
+        instance.fireTimer(tokenId);
         continue;
       }
       const decision = answer.startsWith("a") ? "approved" : "rejected";
-      instance.completeTask({ decision });
+      instance.completeTask(tokenId, { decision });
       continue;
     }
 
     await ask(`Press Enter to complete "${node.name}"...`);
-    instance.completeTask({});
+    instance.completeTask(tokenId, {});
   }
 
   printLog(instance);
-  const outcome = instance.getContext();
   console.log(`Final status: ${instance.getStatus()}`);
-  console.log(`Employee: ${employeeName}, Days: ${days}, Decision path recorded above.`);
-  console.log(JSON.stringify(outcome, null, 2));
+  console.log(`Outcome: ${instance.getEndEvents().map((end) => end.name).join(", ") || "—"}`);
+  console.log(JSON.stringify(instance.getContext(), null, 2));
 
   rl.close();
 }
