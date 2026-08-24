@@ -1,13 +1,15 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { ActionPanel } from "../components/ActionPanel.js";
 import { ClockPanel } from "../components/ClockPanel.js";
 import { LogTimeline } from "../components/LogTimeline.js";
 import { ProcessDiagram } from "../components/ProcessDiagram.js";
 import { RequestForm } from "../components/RequestForm.js";
+import { ValidationPanel } from "../components/ValidationPanel.js";
 import { useWorkflowInstance } from "../hooks/useWorkflowInstance.js";
 import { handlers } from "../workflow/handlers.js";
 import { DEFAULT_PROCESS_ID, findProcess, processLibrary } from "../workflow/processes/index.js";
 import { CLOCK_SPEEDS, DEFAULT_SPEED_ID } from "../workflow/simulationClock.js";
+import { validateProcess } from "../workflow/validate.js";
 import type { StartEventNode } from "../workflow/types.js";
 
 /** Values the engine set itself aren't worth echoing back as "you entered". */
@@ -39,6 +41,19 @@ export function WorkflowPage() {
   const remainingFor = (tokenId: string) =>
     armedTimers.find((timer) => timer.tokenId === tokenId)?.remainingMs;
 
+  const issues = useMemo(
+    () => validateProcess(definition, Object.keys(handlers)),
+    [definition]
+  );
+
+  // Tokens are live but none are actionable and nothing is counting down.
+  const stuck =
+    status === "waiting" &&
+    instance !== null &&
+    activeTasks.length === 0 &&
+    armedTimers.length === 0 &&
+    instance.getTokens().length > 0;
+
   return (
     <div className="page">
       <div className="card process-picker">
@@ -65,6 +80,16 @@ export function WorkflowPage() {
       </div>
 
       <ProcessDiagram process={process} instance={instance} />
+
+      <ValidationPanel issues={issues} />
+
+      {stuck && (
+        <p className="muted parallel-note parallel-note--stuck">
+          Deadlocked. Tokens are parked at a join that is still waiting on a branch which can never
+          arrive — there is nothing left to click. This is the failure the validation panel above
+          predicted.
+        </p>
+      )}
 
       {!instance && (
         <RequestForm start={start} processName={definition.name} onSubmit={submit} />

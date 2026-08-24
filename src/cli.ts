@@ -2,6 +2,7 @@ import { createInterface } from "node:readline";
 import { WorkflowInstance } from "./workflow/engine.js";
 import { handlers } from "./workflow/handlers.js";
 import { loadProcessLibrary } from "./workflow/loadProcessLibrary.node.js";
+import { validateProcess } from "./workflow/validate.js";
 import type { FormField, StartEventNode, WorkflowContext } from "./workflow/types.js";
 
 const library = loadProcessLibrary();
@@ -59,7 +60,15 @@ async function main() {
   console.log("=== BPMN Workflow Simulator ===\n");
 
   const { definition } = await pickProcess();
-  console.log(`\n--- ${definition.name} ---\n`);
+  console.log(`\n--- ${definition.name} ---`);
+
+  const issues = validateProcess(definition, Object.keys(handlers));
+  for (const issue of issues) {
+    const mark = issue.severity === "error" ? "✕" : "!";
+    const where = issue.nodeName ? `${issue.nodeName}: ` : "";
+    console.log(`  ${mark} ${where}${issue.message}`);
+  }
+  console.log();
 
   const start = definition.nodes[definition.startNodeId] as StartEventNode;
   const initialContext: WorkflowContext = {};

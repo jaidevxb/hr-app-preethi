@@ -24,6 +24,7 @@ React/Vite web UI with a full in-app Docs page — what/why/roadmap.
 | **Leave Request Approval** | Boundary timer with SLA escalation, exclusive gateway, an AND-split into a user task + service task that must rejoin before the process ends |
 | **Expense Reimbursement** | A business rule task that decides whether a human is needed at all — small claims skip Finance entirely |
 | **Employee Onboarding** | A three-way parallel split (IT, accounts, buddy) that the join holds until every track lands |
+| **Deadlock Demo** | Deliberately broken: an AND-join downstream of an XOR-split. The validator predicts the hang, then the engine hangs exactly there |
 
 ### Leave Request, in detail
 
@@ -75,6 +76,7 @@ npm run typecheck  # type-check everything (tsc, no emit)
 - `src/workflow/engine.ts` — the token-based `WorkflowInstance` engine (start, completeTask, fireTimer)
 - `src/workflow/handlers.ts` — the code behind each `camunda:topic`, kept out of the process definitions
 - `src/workflow/simulationClock.ts` — the compressed clock boundary timers count against
+- `src/workflow/validate.ts` — structural checks the parser doesn't make: unreachable elements, unreachable end events, joins that can never fire
 - `src/workflow/types.ts` — generic BPMN-ish node/definition types
 - `src/cli.ts` — interactive terminal driver
 - `src/hooks/useWorkflowInstance.ts` — React wrapper around the engine
@@ -88,9 +90,9 @@ full roadmap — that content isn't duplicated here.
 ## Next steps (not built yet)
 
 See the Roadmap section on the in-app Docs page. Short version: step-through
-replay of a finished instance, a validation panel, more BPMN element types
-(inclusive gateways, message events, sub-processes), and eventually diagram
-authoring plus a real BPMN engine (Camunda/Zeebe) behind the same interface.
+replay of a finished instance, more BPMN element types (inclusive gateways,
+message events, sub-processes), and eventually diagram authoring plus a real
+BPMN engine (Camunda/Zeebe) behind the same interface.
 
 Explicit non-goals, since this is a simulator: auth, a database, a dashboard
 of concurrent instances, notifications.

@@ -15,6 +15,7 @@ const messages = (wf: WorkflowInstance) => wf.getLog().map((entry) => entry.mess
 describe("process library", () => {
   it("parses every .bpmn file in the folder", () => {
     expect(processLibrary.map((process) => process.definition.name)).toEqual([
+      "Deadlock Demo (intentionally broken)",
       "Employee Onboarding",
       "Expense Reimbursement",
       "Leave Request Approval",

@@ -88,6 +88,11 @@ const SHIPPED = [
       "A 3-day SLA isn't something you can wait out in a demo, so the timers count against a compressed clock — one simulated day per second or two, adjustable, pausable. Everything else about the timer is real: the engine arms it when a token parks on the task, the deadline is the P3D from the file, and it fires and escalates by itself while you watch the diagram. The manual “simulate timer expiry” button is still there for impatience.",
   },
   {
+    title: "Validation that catches the deadlock before you hit it",
+    detail:
+      "The parser rejects files it cannot execute at all. The validator finds the ones it can run but shouldn't: unreachable elements, a process with no reachable end event, a task nobody is assigned, a service task pointing at a handler nobody wrote — and above all the classic BPMN mistake, an AND-join sitting downstream of an XOR-split, which waits for two branches when only one will ever arrive. The library ships a deliberately broken process so you can watch it happen: the validator predicts the hang, then the engine hangs exactly there.",
+  },
+  {
     title: "A custom-drawn diagram, not the stock renderer",
     detail:
       "The in-app diagram (this one) is hand-rendered SVG instead of bpmn-js's default output — bpmn-js paints everything via inline styles built for a white canvas, which fought every attempt to retheme it into this app's dark/light palette. It now reads its geometry from the file's own BPMNDI section, so it stays a faithful view of the same diagram Camunda Modeler would draw — with full control over the visuals.",
@@ -99,11 +104,6 @@ const ROADMAP = [
     title: "Replay and step-through",
     detail:
       "Scrub a finished instance step by step and watch the tokens travel the diagram. The log records which token did what and the BPMNDI waypoints are already parsed, so the pieces are in place.",
-  },
-  {
-    title: "A validation panel",
-    detail:
-      "Flag unreachable elements, tasks with no outgoing flow, joins that can never fire. The parser already rejects the structural errors it would choke on; this surfaces the ones it can survive but shouldn't — including deadlocks the engine will happily sit in.",
   },
   {
     title: "More of the BPMN vocabulary",
@@ -253,15 +253,18 @@ export function DocsPage() {
       <section className="card docs-section">
         <h2>Current scope — v1</h2>
         <ul>
-          <li>Three processes in the library; adding a fourth is adding a .bpmn file to the folder</li>
+          <li>
+            Four processes in the library — three that work and one deliberately broken; adding another is adding a
+            .bpmn file to the folder
+          </li>
           <li>One in-memory instance at a time — nothing persists across a page refresh or a new CLI run</li>
           <li>
             The SLA timer runs on a compressed simulation clock, not wall time — and only while the tab is open
           </li>
           <li>Start forms come from the file; per-task forms don't exist yet</li>
           <li>
-            A deadlocked join (a token waiting on a branch that can't arrive) is detected and reported, but nothing
-            unwinds it
+            A deadlocked join is predicted by the validator and reported when it happens, but nothing unwinds it —
+            the instance just sits there, which is what a real engine does too
           </li>
           <li>
             Eight BPMN element types are understood (start, user task, service task, business rule task, exclusive
