@@ -2,7 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { WorkflowInstance } from "../workflow/engine.js";
 import { handlers } from "../workflow/handlers.js";
-import { leaveRequestProcess } from "../workflow/processes/index.js";
+import { leaveRequestProcess, processLibrary } from "../workflow/processes/index.js";
 import { ProcessDiagram, WorkflowDiagram } from "./ProcessDiagram.js";
 
 /**
@@ -71,6 +71,47 @@ describe("WorkflowDiagram", () => {
     expect(svg).toContain("diagram-node diagram-node--visited");
     // Nothing on the rejected path has been touched.
     expect(svg).toContain("diagram-node diagram-node--pending");
+  });
+});
+
+/**
+ * Every process is laid out by hand in its .bpmn file, so these check the
+ * whole library rather than just the leave request: a shape with no renderer,
+ * a NaN coordinate or a label that never got wrapped shows up here.
+ */
+describe("every process in the library draws", () => {
+  it.each(processLibrary.map((process) => [process.definition.name, process] as const))(
+    "%s",
+    (_name, process) => {
+      const svg = renderToStaticMarkup(
+        <WorkflowDiagram process={process} visitedIds={[]} activeIds={[]} />
+      );
+
+      // Every element in the file got a shape of some sort.
+      const drawn = (svg.match(/class="diagram-shape/g) ?? []).length;
+      expect(drawn).toBeGreaterThanOrEqual(process.layout.shapes.length);
+
+      // Every edge got a path with an arrowhead.
+      expect(svg.match(/marker-end/g) ?? []).toHaveLength(process.layout.edges.length);
+
+      // No coordinate came out undefined or NaN.
+      expect(svg).not.toMatch(/NaN|undefined/);
+
+      // Every label the layout produced actually made it into the markup.
+      for (const shape of process.layout.shapes) {
+        for (const line of shape.label?.lines ?? []) {
+          expect(svg, `${shape.id} label`).toContain(line);
+        }
+      }
+    }
+  );
+
+  it("gives the viewBox of each diagram a positive width and height", () => {
+    for (const { definition, layout } of processLibrary) {
+      const [, , width, height] = layout.viewBox.split(" ").map(Number);
+      expect(width, `${definition.name} width`).toBeGreaterThan(0);
+      expect(height, `${definition.name} height`).toBeGreaterThan(0);
+    }
   });
 });
 
