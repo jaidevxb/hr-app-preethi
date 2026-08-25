@@ -1,5 +1,8 @@
 import type { ArmedTimer } from "../workflow/engine.js";
 import { CLOCK_SPEEDS, formatDuration } from "../workflow/simulationClock.js";
+import { Select } from "./Select.js";
+
+const SPEED_OPTIONS = CLOCK_SPEEDS.map((speed) => ({ value: speed.id, label: speed.label }));
 
 export function ClockPanel({
   speedId,
@@ -23,16 +26,13 @@ export function ClockPanel({
             {formatDuration(elapsedSimMs)} elapsed in the process
           </p>
         </div>
-        <label className="clock-speed">
-          Speed
-          <select value={speedId} onChange={(event) => onSpeedChange(event.target.value)}>
-            {CLOCK_SPEEDS.map((speed) => (
-              <option key={speed.id} value={speed.id}>
-                {speed.label}
-              </option>
-            ))}
-          </select>
-        </label>
+        <Select
+          className="clock-speed"
+          label="Speed"
+          value={speedId}
+          options={SPEED_OPTIONS}
+          onChange={onSpeedChange}
+        />
       </div>
 
       {armedTimers.length > 0 ? (

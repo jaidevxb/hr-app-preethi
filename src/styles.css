@@ -273,9 +273,7 @@ form label {
   color: var(--muted);
 }
 
-form input,
-form select,
-.process-picker select {
+form input {
   display: block;
   width: 100%;
   margin-top: 0.45rem;
@@ -295,18 +293,164 @@ form input::placeholder {
   opacity: 0.85;
 }
 
-form input:hover,
-form select:hover,
-.process-picker select:hover {
+form input:hover {
   border-color: var(--accent);
 }
 
-form input:focus,
-form select:focus,
-.process-picker select:focus {
+form input:focus {
   outline: none;
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+/* ---------------------------------------------------------------- Select --
+   A native <select>'s popup is drawn by the OS and ignores this palette
+   entirely, so it's rebuilt as a button plus a listbox. */
+.select {
+  position: relative;
+}
+
+.select-label {
+  display: block;
+  margin-bottom: 0.45rem;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.select-button {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid var(--field-border);
+  border-radius: 10px;
+  background: var(--field-bg);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.95rem;
+  text-align: left;
+  cursor: pointer;
+  box-shadow: inset 0 1px 3px rgba(20, 15, 5, 0.08);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.select-button:hover {
+  border-color: var(--accent);
+}
+
+.select-button:focus-visible,
+.select-button.is-open {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.select-value {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.select-caret {
+  flex-shrink: 0;
+  color: var(--muted);
+  font-size: 0.7rem;
+  transition: transform 0.15s ease;
+}
+
+.select-button.is-open .select-caret {
+  transform: rotate(180deg);
+}
+
+.select-list {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 0.35rem);
+  left: 0;
+  right: 0;
+  max-height: 17rem;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0.3rem;
+  list-style: none;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: var(--shadow-lg);
+}
+
+.select-option {
+  display: block;
+  padding: 0.5rem 0.6rem;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: background 0.1s ease;
+}
+
+.select-option.is-active {
+  background: var(--accent-soft);
+}
+
+.select-option-main {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.9rem;
+}
+
+.select-option-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.select-option.is-selected .select-option-label {
+  font-weight: 600;
+}
+
+.select-check {
+  flex-shrink: 0;
+  width: 0.9rem;
+  color: var(--accent);
+  font-size: 0.8rem;
+}
+
+/* The derived "what's interesting here" line */
+.select-option-hint {
+  display: block;
+  margin-top: 0.15rem;
+  padding-left: 0.05rem;
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-family: var(--font-mono);
+}
+
+.select-warning {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 50%;
+  background: var(--danger-soft);
+  color: var(--danger);
+  font-size: 0.65rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* Enum fields inside a form line up with the inputs around them */
+.form-select {
+  margin-bottom: 1.15rem;
 }
 
 /* Boolean form fields sit inline rather than stacked over an input */
@@ -324,16 +468,8 @@ form select:focus,
 }
 
 /* Process library picker */
-.process-picker label {
-  display: block;
-  margin-bottom: 0.6rem;
-  font-size: 0.82rem;
-  font-weight: 500;
-  color: var(--muted);
-}
-
 .process-picker p {
-  margin: 0;
+  margin: 0.75rem 0 0;
   font-size: 0.8rem;
 }
 
@@ -783,16 +919,15 @@ form > .btn-block {
 }
 
 .clock-speed {
-  display: block;
-  margin: 0;
-  font-size: 0.78rem;
-  font-weight: 500;
-  color: var(--muted);
+  min-width: 9.5rem;
 }
 
-.clock-speed select {
-  width: auto;
-  min-width: 8rem;
+.clock-speed .select-label {
+  margin-bottom: 0.3rem;
+  font-size: 0.78rem;
+}
+
+.clock-speed .select-button {
   padding: 0.45rem 0.6rem;
   font-size: 0.85rem;
 }

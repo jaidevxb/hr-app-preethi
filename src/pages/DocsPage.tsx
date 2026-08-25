@@ -1,3 +1,8 @@
+import { processLibrary } from "../workflow/processes/index.js";
+
+/** Deadlock Demo ships broken on purpose so the validation panel has a subject. */
+const BROKEN_ON_PURPOSE = 1;
+
 const GLOSSARY = [
   {
     icon: "○",
@@ -17,6 +22,13 @@ const GLOSSARY = [
     meaning:
       "A step the system performs by itself — no human involved. The file names a topic; the app supplies the code behind it.",
     here: '"Update Leave Balance" — deducts the days from the employee\'s allowance',
+  },
+  {
+    icon: "▤",
+    name: "Business Rule Task",
+    meaning:
+      "An automated step that applies a policy and writes its verdict back into the process, usually so a gateway right after it can branch on the answer.",
+    here: '"Check Expense Policy" — small claims are approved without a human seeing them',
   },
   {
     icon: "◇",
@@ -264,8 +276,22 @@ export function DocsPage() {
             <code>src/workflow/types.ts</code> — node & definition types; the "schema" for any BPMN-style flow
           </li>
           <li>
-            <code>src/workflow/engine.ts</code> — generic <code>WorkflowInstance</code> engine (start / completeTask
-            / fireTimer)
+            <code>src/workflow/engine.ts</code> — the token-based <code>WorkflowInstance</code> (start /
+            completeTask / fireTimer / deliverMessage / broadcastSignal / tick)
+          </li>
+          <li>
+            <code>src/workflow/graph.ts</code> — reachability over the process graph, shared by the inclusive join
+            and the validator
+          </li>
+          <li>
+            <code>src/workflow/validate.ts</code> — the structural checks behind the validation panel
+          </li>
+          <li>
+            <code>src/workflow/simulationClock.ts</code> — the compressed clock the timers count against
+          </li>
+          <li>
+            <code>src/workflow/describeProcess.ts</code> — reads a process's notable elements off its definition, so
+            the picker describes whatever is in the folder
           </li>
           <li>
             <code>src/cli.ts</code> — terminal driver: pick a process, fill its form, walk it
@@ -282,11 +308,11 @@ export function DocsPage() {
       </section>
 
       <section className="card docs-section">
-        <h2>Current scope — v1</h2>
+        <h2>Current scope</h2>
         <ul>
           <li>
-            Six processes in the library — five that work and one deliberately broken; adding another is adding a
-            .bpmn file to the folder
+            {processLibrary.length} processes in the library — {processLibrary.length - BROKEN_ON_PURPOSE} that work
+            and one deliberately broken; adding another is adding a .bpmn file to the folder
           </li>
           <li>One in-memory instance at a time — nothing persists across a page refresh or a new CLI run</li>
           <li>
@@ -298,10 +324,8 @@ export function DocsPage() {
             the instance just sits there, which is what a real engine does too
           </li>
           <li>
-            Eleven BPMN element types are understood (start, user task, service task, business rule task, exclusive
-            gateway, inclusive gateway, parallel gateway, boundary timer, intermediate catch —
-            timer/message/signal, end, terminate end); anything else in a file is rejected rather than silently
-            ignored
+            {GLOSSARY.length} BPMN element types are understood — the ones in the glossary above, and nothing else.
+            Anything unrecognised in a file is rejected rather than silently ignored
           </li>
           <li>The diagram is read-only — a renderer for this subset, not a general-purpose one</li>
           <li>The request form's fields are hardcoded, not read from the process</li>
@@ -360,9 +384,10 @@ export function DocsPage() {
       <section className="card docs-section">
         <h2>Where this currently stops</h2>
         <p>
-          Right here: one process, playable end-to-end through both the CLI and this UI, loaded and drawn from a
-          real BPMN 2.0 file, unit-tested, and documented. Nothing else on the roadmap above is built yet — each
-          item gets picked up only when it's actually needed next, not speculatively.
+          Right here: {processLibrary.length} processes, each playable end-to-end through both the CLI and this UI,
+          every one of them loaded and drawn from a real BPMN 2.0 file, unit-tested, and documented. Nothing else on
+          the roadmap above is built yet — each item gets picked up only when it's actually needed next, not
+          speculatively.
         </p>
       </section>
     </div>

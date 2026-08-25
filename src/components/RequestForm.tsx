@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import type { FormField, StartEventNode, WorkflowContext } from "../workflow/types.js";
+import { Select } from "./Select.js";
 
 function initialValues(fields: FormField[]): Record<string, string> {
   return Object.fromEntries(
@@ -76,17 +77,20 @@ export function RequestForm({
 
         if (field.type === "enum") {
           return (
-            <label key={field.id}>
-              {field.label}
-              <select value={values[field.id] ?? ""} onChange={(event) => set(field.id, event.target.value)}>
-                <option value="">Select…</option>
-                {field.options?.map((option) => (
-                  <option key={option.id} value={option.id}>
-                    {option.name}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <Select
+              key={field.id}
+              className="form-select"
+              label={field.label}
+              value={values[field.id] ?? ""}
+              options={[
+                { value: "", label: "Select…" },
+                ...(field.options ?? []).map((option) => ({
+                  value: option.id,
+                  label: option.name,
+                })),
+              ]}
+              onChange={(next) => set(field.id, next)}
+            />
           );
         }
 

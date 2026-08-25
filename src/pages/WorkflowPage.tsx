@@ -6,8 +6,10 @@ import { LogTimeline } from "../components/LogTimeline.js";
 import { ProcessDiagram } from "../components/ProcessDiagram.js";
 import { ReplayPanel } from "../components/ReplayPanel.js";
 import { RequestForm } from "../components/RequestForm.js";
+import { Select } from "../components/Select.js";
 import { ValidationPanel } from "../components/ValidationPanel.js";
 import { useWorkflowInstance } from "../hooks/useWorkflowInstance.js";
+import { describeProcess } from "../workflow/describeProcess.js";
 import { handlers } from "../workflow/handlers.js";
 import { DEFAULT_PROCESS_ID, findProcess, processLibrary } from "../workflow/processes/index.js";
 import { CLOCK_SPEEDS, DEFAULT_SPEED_ID } from "../workflow/simulationClock.js";
@@ -18,6 +20,20 @@ import type { StartEventNode } from "../workflow/types.js";
 function contextEntries(context: Record<string, unknown>) {
   return Object.entries(context).filter(([, value]) => value !== undefined && value !== "");
 }
+
+/**
+ * Built once: every option's label, its "what's interesting here" line and its
+ * warning flag are all read off the parsed definition, so the picker describes
+ * whatever happens to be in the folder.
+ */
+const processOptions = processLibrary.map(({ definition }) => ({
+  value: definition.id,
+  label: definition.name,
+  hint: describeProcess(definition),
+  warning: validateProcess(definition, Object.keys(handlers)).some(
+    (issue) => issue.severity === "error"
+  ),
+}));
 
 export function WorkflowPage() {
   const [processId, setProcessId] = useState(DEFAULT_PROCESS_ID);
@@ -75,23 +91,16 @@ export function WorkflowPage() {
   return (
     <div className="page">
       <div className="card process-picker">
-        <label>
-          Process
-          <select
-            value={processId}
-            onChange={(event) => {
-              setProcessId(event.target.value);
-              exitReplay();
-              reset();
-            }}
-          >
-            {processLibrary.map((candidate) => (
-              <option key={candidate.definition.id} value={candidate.definition.id}>
-                {candidate.definition.name}
-              </option>
-            ))}
-          </select>
-        </label>
+        <Select
+          label="Process"
+          value={processId}
+          options={processOptions}
+          onChange={(id) => {
+            setProcessId(id);
+            exitReplay();
+            reset();
+          }}
+        />
         <p className="muted">
           {processLibrary.length} processes, each one a .bpmn file in{" "}
           <code>src/workflow/processes/</code>. The engine is the same for all of them.
