@@ -1,7 +1,9 @@
+import { canReach } from "./graph.js";
 import { isAutomatedTask } from "./types.js";
 import type {
   AutomatedTaskNode,
   EndEventNode,
+  InclusiveGatewayNode,
   LogEntry,
   NodeId,
   ParallelGatewayNode,
@@ -272,6 +274,11 @@ export class WorkflowInstance {
       return;
     }
 
+    if (node.type === "inclusiveGateway") {
+      this.stepInclusiveGateway(node, token);
+      return;
+    }
+
     if (node.type === "parallelGateway") {
       this.stepParallelGateway(node, token);
       return;
@@ -281,6 +288,63 @@ export class WorkflowInstance {
     this.record(node, `Workflow ended: ${node.outcome}`, token);
     this.reachedEnds.push(node);
     this.consume(token);
+  }
+
+  private stepInclusiveGateway(node: InclusiveGatewayNode, token: Token): void {
+    if (node.incomingCount > 1) {
+      const arrived = this.tokens.filter((candidate) => candidate.nodeId === node.id);
+
+      // An inclusive join can't wait for a fixed number — the split decided how
+      // many branches to activate at runtime. So it waits until nothing else
+      // could still turn up: no other live token can reach this gateway.
+      const stillComing = this.tokens.some(
+        (candidate) =>
+          candidate.nodeId !== node.id &&
+          canReach(this.definition, candidate.nodeId, node.id)
+      );
+
+      if (stillComing) {
+        // No count here on purpose: tokens are queued the moment they're moved,
+        // so "how many have arrived" is ambiguous mid-drain. What matters is
+        // that at least one more branch is still live.
+        this.record(node, "Waiting to join — another branch is still running", token);
+        return;
+      }
+
+      for (const other of arrived) {
+        if (other.id !== token.id) this.consume(other);
+      }
+      if (arrived.length > 1) {
+        this.record(node, `Joined ${arrived.length} branches`, token);
+      }
+    }
+
+    const matched = node.branches.filter((branch) => branch.condition(this.context));
+    const taken = matched.length > 0 ? matched.map((branch) => branch.next) : [node.default];
+
+    // A gateway used purely as a join has one unconditional way out; saying a
+    // "branch was taken" there is noise, not information.
+    const isPureJoin = node.branches.length === 1;
+
+    if (matched.length === 0) {
+      this.record(node, "No branch matched, using default", token);
+    } else if (matched.length === 1) {
+      if (!isPureJoin) this.record(node, `Branch "${matched[0].label}" taken`, token);
+    } else {
+      this.record(
+        node,
+        `${matched.length} of ${node.branches.length} branches taken: ${matched
+          .map((branch) => `"${branch.label}"`)
+          .join(", ")}`,
+        token
+      );
+    }
+
+    for (const target of taken.slice(1)) {
+      const branch = this.createToken(target);
+      this.queue.push(branch.id);
+    }
+    this.moveToken(token, taken[0]);
   }
 
   private stepParallelGateway(node: ParallelGatewayNode, token: Token): void {

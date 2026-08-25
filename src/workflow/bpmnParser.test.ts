@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { BpmnParseError, parseBpmn, parseIsoDuration } from "./bpmnParser.js";
 import { ConditionExpressionError, parseCondition } from "./conditionExpression.js";
-import { leaveRequestProcess } from "./processes/index.js";
+import { findProcess, leaveRequestProcess } from "./processes/index.js";
 
 const { definition, layout } = leaveRequestProcess;
 
@@ -29,6 +29,27 @@ describe("parseBpmn — process semantics", () => {
       joinCount: 2,
       next: ["endApproved"],
     });
+  });
+
+  it("treats an unconditioned flow out of an inclusive gateway as always taken", () => {
+    const offboarding = findProcess("Process_EmployeeOffboarding").definition;
+    const split = offboarding.nodes.splitExit;
+    if (split.type !== "inclusiveGateway") throw new Error("expected an inclusive gateway");
+
+    expect(split.branches.map((branch) => branch.label)).toEqual([
+      "Always",
+      "Has laptop",
+      "Has parking pass",
+    ]);
+    // The unconditioned one holds no matter what the context says.
+    expect(split.branches[0].condition({})).toBe(true);
+    expect(split.branches[1].condition({ hasLaptop: true })).toBe(true);
+    expect(split.branches[1].condition({ hasLaptop: false })).toBe(false);
+    expect(split.incomingCount).toBe(1);
+
+    const join = offboarding.nodes.joinExit;
+    if (join.type !== "inclusiveGateway") throw new Error("expected an inclusive gateway");
+    expect(join.incomingCount).toBe(3);
   });
 
   it("reads a service task's handler topic", () => {

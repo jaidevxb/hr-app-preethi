@@ -5,6 +5,7 @@ import type {
   EndEventNode,
   ExclusiveGatewayNode,
   FormField,
+  InclusiveGatewayNode,
   NodeId,
   ParallelGatewayNode,
   ServiceTaskNode,
@@ -35,6 +36,7 @@ export type ShapeKind =
   | "serviceTask"
   | "businessRuleTask"
   | "exclusiveGateway"
+  | "inclusiveGateway"
   | "parallelGateway"
   | "boundary";
 
@@ -297,6 +299,12 @@ function readNodes(
     add(readGateway(raw, id, flows));
   }
 
+  for (const raw of toArray<XmlNode>(process.inclusiveGateway)) {
+    const id = attr(raw, "id");
+    if (!id) throw new BpmnParseError("<bpmn:inclusiveGateway> is missing an id");
+    add(readInclusiveGateway(raw, id, flows));
+  }
+
   for (const raw of toArray<XmlNode>(process.parallelGateway)) {
     const id = attr(raw, "id");
     if (!id) throw new BpmnParseError("<bpmn:parallelGateway> is missing an id");
@@ -447,6 +455,49 @@ function readGateway(
   };
 }
 
+function readInclusiveGateway(
+  raw: XmlNode,
+  id: NodeId,
+  flows: Map<string, SequenceFlow>
+): InclusiveGatewayNode {
+  const outgoing = outgoingFlows(id, flows);
+  if (outgoing.length === 0) {
+    throw new BpmnParseError(`Inclusive gateway "${id}" has no outgoing sequence flows`);
+  }
+
+  const defaultFlowId = attr(raw, "default");
+  const defaultFlow = defaultFlowId ? flows.get(defaultFlowId) : undefined;
+  if (defaultFlowId && !defaultFlow) {
+    throw new BpmnParseError(`Gateway "${id}" names an unknown default flow "${defaultFlowId}"`);
+  }
+
+  // Unlike an exclusive gateway, every branch here is evaluated and every one
+  // that holds is taken. An outgoing flow with no conditionExpression is
+  // always taken — the default is the fallback for when nothing matches.
+  const branches = outgoing
+    .filter((flow) => flow.id !== defaultFlowId)
+    .map((flow) => ({
+      label: flow.name ?? flow.id,
+      condition: flow.condition ? parseCondition(flow.condition) : () => true,
+      next: flow.targetRef,
+    }));
+
+  if (branches.length === 0) {
+    throw new BpmnParseError(
+      `Inclusive gateway "${id}" has nothing but a default flow — it can't decide anything`
+    );
+  }
+
+  return {
+    id,
+    type: "inclusiveGateway",
+    name: attr(raw, "name") ?? id,
+    branches,
+    default: defaultFlow?.targetRef ?? outgoing[outgoing.length - 1].targetRef,
+    incomingCount: [...flows.values()].filter((flow) => flow.targetRef === id).length,
+  };
+}
+
 function attachBoundaryTimers(
   process: XmlNode,
   nodes: Record<NodeId, WorkflowNode>,
@@ -503,6 +554,7 @@ function assertTargetsResolve(nodes: Record<NodeId, WorkflowNode>): void {
         if (node.timer) targets.push(node.timer.next);
         break;
       case "exclusiveGateway":
+      case "inclusiveGateway":
         targets.push(node.default, ...node.branches.map((branch) => branch.next));
         break;
       case "parallelGateway":

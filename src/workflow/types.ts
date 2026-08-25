@@ -79,15 +79,32 @@ export interface BusinessRuleTaskNode extends BaseNode {
   next: NodeId;
 }
 
+export interface GatewayBranch {
+  label: string;
+  condition: (ctx: WorkflowContext) => boolean;
+  next: NodeId;
+}
+
 // BPMN: Exclusive (Decision) Gateway — exactly one outgoing path is taken.
 export interface ExclusiveGatewayNode extends BaseNode {
   type: "exclusiveGateway";
-  branches: Array<{
-    label: string;
-    condition: (ctx: WorkflowContext) => boolean;
-    next: NodeId;
-  }>;
+  branches: GatewayBranch[];
   default: NodeId;
+}
+
+/**
+ * BPMN: Inclusive (OR) Gateway. Splitting takes *every* branch whose condition
+ * holds — one, some, or all of them. Joining is the subtle part: it can't wait
+ * for a fixed number, because how many branches were activated is only known
+ * at runtime. It waits until no token anywhere else in the process could still
+ * reach it.
+ */
+export interface InclusiveGatewayNode extends BaseNode {
+  type: "inclusiveGateway";
+  branches: GatewayBranch[];
+  default: NodeId;
+  /** More than one incoming flow means this gateway also acts as a join. */
+  incomingCount: number;
 }
 
 /**
@@ -108,6 +125,7 @@ export type WorkflowNode =
   | ServiceTaskNode
   | BusinessRuleTaskNode
   | ExclusiveGatewayNode
+  | InclusiveGatewayNode
   | ParallelGatewayNode;
 
 export type AutomatedTaskNode = ServiceTaskNode | BusinessRuleTaskNode;

@@ -1,5 +1,6 @@
+import { outgoingTargets, reachableFrom } from "./graph.js";
 import { isAutomatedTask } from "./types.js";
-import type { NodeId, WorkflowDefinition, WorkflowNode } from "./types.js";
+import type { NodeId, WorkflowDefinition } from "./types.js";
 
 export type IssueSeverity = "error" | "warning";
 
@@ -9,40 +10,6 @@ export interface ValidationIssue {
   nodeId?: NodeId;
   nodeName?: string;
   message: string;
-}
-
-/** Everywhere a token can go from this element, ignoring conditions. */
-export function outgoingTargets(node: WorkflowNode): NodeId[] {
-  switch (node.type) {
-    case "startEvent":
-    case "serviceTask":
-    case "businessRuleTask":
-      return [node.next];
-    case "userTask":
-      return node.timer ? [node.next, node.timer.next] : [node.next];
-    case "exclusiveGateway":
-      return [...new Set([node.default, ...node.branches.map((branch) => branch.next)])];
-    case "parallelGateway":
-      return [...new Set(node.next)];
-    case "endEvent":
-      return [];
-  }
-}
-
-function reachableFrom(definition: WorkflowDefinition, startId: NodeId): Set<NodeId> {
-  const seen = new Set<NodeId>();
-  const queue = [startId];
-
-  while (queue.length > 0) {
-    const id = queue.shift()!;
-    if (seen.has(id)) continue;
-    seen.add(id);
-
-    const node = definition.nodes[id];
-    if (!node) continue;
-    queue.push(...outgoingTargets(node));
-  }
-  return seen;
 }
 
 /**

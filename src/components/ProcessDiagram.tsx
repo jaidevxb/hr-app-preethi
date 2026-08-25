@@ -74,7 +74,10 @@ function TaskIcon({ shape }: { shape: DiagramShape }) {
 function Shape({ shape, state }: { shape: DiagramShape; state: NodeState }) {
   const cx = shape.x + shape.w / 2;
   const cy = shape.y + shape.h / 2;
-  const isGateway = shape.kind === "exclusiveGateway" || shape.kind === "parallelGateway";
+  const isGateway =
+    shape.kind === "exclusiveGateway" ||
+    shape.kind === "inclusiveGateway" ||
+    shape.kind === "parallelGateway";
 
   return (
     <g className={`diagram-node diagram-node--${state}`}>
@@ -116,6 +119,11 @@ function Shape({ shape, state }: { shape: DiagramShape; state: NodeState }) {
           className="diagram-glyph diagram-glyph--bold"
           d={`M${cx - 10},${cy} L${cx + 10},${cy} M${cx},${cy - 10} L${cx},${cy + 10}`}
         />
+      )}
+
+      {/* Inclusive gateways are marked with a thick O. */}
+      {shape.kind === "inclusiveGateway" && (
+        <circle className="diagram-glyph diagram-glyph--bold" cx={cx} cy={cy} r={9} />
       )}
 
       {shape.label && (

@@ -38,6 +38,16 @@ export const handlers: ServiceHandlers = {
     message: `Queued ₹${Number(ctx.amount) || 0} for the next payroll run`,
   }),
 
+  "offboarding.revokeAccess": (ctx) => ({
+    context: { accessRevokedFor: String(ctx.employeeName ?? "the leaver") },
+    message: `Revoked SSO, email and repo access for ${String(ctx.employeeName ?? "the leaver")}`,
+  }),
+
+  "offboarding.revokeParking": () => ({
+    context: { parkingPassReturned: true },
+    message: "Parking pass deactivated and barrier access removed",
+  }),
+
   "onboarding.createAccounts": (ctx) => {
     const name = String(ctx.employeeName ?? "the new hire");
     const handle = name.trim().split(/\s+/)[0].toLowerCase() || "newhire";

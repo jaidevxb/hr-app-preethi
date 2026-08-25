@@ -25,6 +25,13 @@ const GLOSSARY = [
     here: '"Approved?" branches to HR processing or straight to Rejected',
   },
   {
+    icon: "◎",
+    name: "Inclusive Gateway",
+    meaning:
+      "An OR-split: takes every outgoing path whose condition holds — one, some, or all. The matching join can't wait for a fixed number, so it waits until no token anywhere else could still reach it.",
+    here: "Offboarding always revokes access, and adds the laptop and parking tracks only if they apply",
+  },
+  {
     icon: "✛",
     name: "Parallel Gateway",
     meaning:
@@ -88,6 +95,11 @@ const SHIPPED = [
       "A 3-day SLA isn't something you can wait out in a demo, so the timers count against a compressed clock — one simulated day per second or two, adjustable, pausable. Everything else about the timer is real: the engine arms it when a token parks on the task, the deadline is the P3D from the file, and it fires and escalates by itself while you watch the diagram. The manual “simulate timer expiry” button is still there for impatience.",
   },
   {
+    title: "Inclusive gateways, joined the way the spec actually says",
+    detail:
+      "An OR-split takes every branch whose condition holds, so how many branches are running is only known at runtime — which means the join can't count to a fixed number the way a parallel join does. It waits until no live token anywhere else in the process could still reach it, then merges however many turned up. Offboarding shows it: revoking access always runs, the laptop and parking tracks are conditional, and the join closes on one, two or three branches depending on the form.",
+  },
+  {
     title: "Step-through replay",
     detail:
       "Any instance can be replayed from its log — play it through, scrub to a step, or walk it one entry at a time while the diagram highlights exactly the element that entry touched. With parallel branches the log interleaves two tokens, and stepping through it is the clearest way to see that they really did run at the same time.",
@@ -108,7 +120,7 @@ const ROADMAP = [
   {
     title: "More of the BPMN vocabulary",
     detail:
-      "Inclusive (OR) gateways, message and signal events, sub-processes, terminate end events. Each one is a new element in the glossary and a new behaviour in the engine — which is the whole point of the exercise.",
+      "Message and signal events, intermediate catch events, sub-processes, terminate end events. Each one is a new element in the glossary and a new behaviour in the engine — which is the whole point of the exercise.",
   },
   {
     title: "Diagram authoring, not just viewing",
@@ -254,7 +266,7 @@ export function DocsPage() {
         <h2>Current scope — v1</h2>
         <ul>
           <li>
-            Four processes in the library — three that work and one deliberately broken; adding another is adding a
+            Five processes in the library — four that work and one deliberately broken; adding another is adding a
             .bpmn file to the folder
           </li>
           <li>One in-memory instance at a time — nothing persists across a page refresh or a new CLI run</li>
@@ -267,9 +279,9 @@ export function DocsPage() {
             the instance just sits there, which is what a real engine does too
           </li>
           <li>
-            Eight BPMN element types are understood (start, user task, service task, business rule task, exclusive
-            gateway, parallel gateway, boundary timer, end); anything else in a file is rejected rather than
-            silently ignored
+            Nine BPMN element types are understood (start, user task, service task, business rule task, exclusive
+            gateway, inclusive gateway, parallel gateway, boundary timer, end); anything else in a file is rejected
+            rather than silently ignored
           </li>
           <li>The diagram is read-only — a renderer for this subset, not a general-purpose one</li>
           <li>The request form's fields are hardcoded, not read from the process</li>

@@ -16,6 +16,7 @@ describe("process library", () => {
   it("parses every .bpmn file in the folder", () => {
     expect(processLibrary.map((process) => process.definition.name)).toEqual([
       "Deadlock Demo (intentionally broken)",
+      "Employee Offboarding",
       "Employee Onboarding",
       "Expense Reimbursement",
       "Leave Request Approval",
@@ -61,6 +62,67 @@ describe("Expense Reimbursement", () => {
     wf.completeTask(wf.getActiveTasks()[0].tokenId, { decision: "rejected" });
 
     expect(wf.getEndEvents().map((end) => end.id)).toEqual(["endRejected"]);
+  });
+});
+
+describe("Employee Offboarding — inclusive gateway", () => {
+  const offboard = (context: Record<string, unknown>) =>
+    run("Process_EmployeeOffboarding", { employeeName: "Dev", ...context });
+
+  /** Walk any remaining user tasks to the end. */
+  function finish(wf: ReturnType<typeof run>) {
+    while (wf.getStatus() === "waiting" && wf.getActiveTasks().length > 0) {
+      wf.completeTask(wf.getActiveTasks()[0].tokenId, {});
+    }
+    return wf;
+  }
+
+  it("takes only the unconditional branch when nothing else applies", () => {
+    const wf = offboard({ hasLaptop: false, hasParkingPass: false });
+
+    expect(messages(wf)).toContain('Branch "Always" taken');
+    // Straight to the exit interview: the join had nothing to wait for.
+    expect(wf.getActiveTasks()[0].node.id).toBe("exitInterview");
+    expect(messages(wf).some((message) => message.startsWith("Waiting to join"))).toBe(false);
+
+    finish(wf);
+    expect(wf.getStatus()).toBe("completed");
+  });
+
+  it("takes two branches and joins exactly two", () => {
+    const wf = offboard({ hasLaptop: true, hasParkingPass: false });
+
+    expect(messages(wf)).toContain('2 of 3 branches taken: "Always", "Has laptop"');
+    expect(wf.getActiveTasks()[0].node.id).toBe("collectLaptop");
+    expect(messages(wf)).toContain("Waiting to join — another branch is still running");
+
+    wf.completeTask(wf.getActiveTasks()[0].tokenId, {});
+    // The crucial bit: it joined 2, not the 3 incoming flows it has.
+    expect(messages(wf)).toContain("Joined 2 branches");
+    expect(wf.getActiveTasks()[0].node.id).toBe("exitInterview");
+  });
+
+  it("takes all three when the form says so", () => {
+    const wf = offboard({ hasLaptop: true, hasParkingPass: true });
+
+    expect(messages(wf)).toContain(
+      '3 of 3 branches taken: "Always", "Has laptop", "Has parking pass"'
+    );
+    wf.completeTask(wf.getActiveTasks()[0].tokenId, {});
+    expect(messages(wf)).toContain("Joined 3 branches");
+
+    finish(wf);
+    expect(wf.getStatus()).toBe("completed");
+    expect(wf.getContext()).toMatchObject({ parkingPassReturned: true, accessRevokedFor: "Dev" });
+  });
+
+  it("never logs a branch decision for the gateway used purely as a join", () => {
+    const wf = finish(offboard({ hasLaptop: false, hasParkingPass: false }));
+    const joinEntries = wf.getLog().filter((entry) => entry.nodeId === "joinExit");
+
+    expect(joinEntries.map((entry) => entry.message)).not.toContain(
+      'Branch "flow_join_exitInterview" taken'
+    );
   });
 });
 
