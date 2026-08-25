@@ -1,6 +1,8 @@
 import { useState } from "react";
+import { version } from "../package.json";
 import { DocsPage } from "./pages/DocsPage.js";
 import { WorkflowPage } from "./pages/WorkflowPage.js";
+import { processLibrary } from "./workflow/processes/index.js";
 
 type Page = "workflow" | "docs";
 
@@ -16,8 +18,11 @@ export function App() {
             ◆
           </span>
           <div className="brand-text">
-            <span className="brand-name">Leave Request</span>
-            <span className="brand-tag">BPMN 2.0 Workflow · v1</span>
+            <span className="brand-name">BPMN Simulator</span>
+            {/* Counted from the library so it can't go stale when a file lands. */}
+            <span className="brand-tag">
+              BPMN 2.0 · {processLibrary.length} processes
+            </span>
           </div>
         </div>
         <nav className="tabs">
@@ -36,7 +41,7 @@ export function App() {
       <main>{page === "workflow" ? <WorkflowPage /> : <DocsPage />}</main>
 
       <footer className="footer">
-        <div>Leave Request Workflow — a BPMN process modeling project</div>
+        <div>A hand-built BPMN 2.0 engine, with a library of processes to run through it</div>
         <div className="footer-links">
           <a href="https://github.com/jaidevxb/hr-app-preethi" target="_blank" rel="noreferrer">
             GitHub
@@ -44,7 +49,8 @@ export function App() {
           <span className="footer-dot" aria-hidden>
             ·
           </span>
-          <span className="footer-version">v1.0.0</span>
+          {/* Read from package.json rather than typed here, so it stays true. */}
+          <span className="footer-version">v{version}</span>
         </div>
       </footer>
     </div>
