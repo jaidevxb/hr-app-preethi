@@ -71,6 +71,37 @@ function TaskIcon({ shape }: { shape: DiagramShape }) {
   return null;
 }
 
+function isCatchKind(kind: DiagramShape["kind"]): boolean {
+  return kind === "catchTimer" || kind === "catchMessage" || kind === "catchSignal";
+}
+
+/** The symbol inside an intermediate catch event: clock, envelope, triangle. */
+function CatchGlyph({ kind, cx, cy }: { kind: DiagramShape["kind"]; cx: number; cy: number }) {
+  if (kind === "catchTimer") {
+    return (
+      <g className="diagram-glyph">
+        <circle cx={cx} cy={cy} r={7} />
+        <path d={`M${cx},${cy - 4.5} L${cx},${cy} L${cx + 3.5},${cy + 2}`} />
+      </g>
+    );
+  }
+
+  if (kind === "catchMessage") {
+    return (
+      <g className="diagram-glyph">
+        <rect x={cx - 7} y={cy - 5} width={14} height={10} rx={1} />
+        <path d={`M${cx - 7},${cy - 5} L${cx},${cy + 1} L${cx + 7},${cy - 5}`} />
+      </g>
+    );
+  }
+
+  return (
+    <g className="diagram-glyph">
+      <path d={`M${cx},${cy - 6.5} L${cx + 7},${cy + 5} L${cx - 7},${cy + 5} Z`} />
+    </g>
+  );
+}
+
 function Shape({ shape, state }: { shape: DiagramShape; state: NodeState }) {
   const cx = shape.x + shape.w / 2;
   const cy = shape.y + shape.h / 2;
@@ -91,6 +122,23 @@ function Shape({ shape, state }: { shape: DiagramShape; state: NodeState }) {
       {shape.kind === "start" && <circle className="diagram-shape diagram-shape--start" cx={cx} cy={cy} r={shape.w / 2} />}
 
       {shape.kind === "end" && <circle className="diagram-shape diagram-shape--end" cx={cx} cy={cy} r={shape.w / 2} />}
+
+      {/* Terminate end event: the thick end ring with a filled disc inside. */}
+      {shape.kind === "endTerminate" && (
+        <>
+          <circle className="diagram-shape diagram-shape--end" cx={cx} cy={cy} r={shape.w / 2} />
+          <circle className="diagram-terminate" cx={cx} cy={cy} r={shape.w / 2 - 6} />
+        </>
+      )}
+
+      {/* Intermediate catch events are drawn as a double ring. */}
+      {isCatchKind(shape.kind) && (
+        <>
+          <circle className="diagram-shape diagram-shape--start" cx={cx} cy={cy} r={shape.w / 2} />
+          <circle className="diagram-shape diagram-shape--start" cx={cx} cy={cy} r={shape.w / 2 - 3.5} />
+          <CatchGlyph kind={shape.kind} cx={cx} cy={cy} />
+        </>
+      )}
 
       {shape.kind === "boundary" && (
         <>

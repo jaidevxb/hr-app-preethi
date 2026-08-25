@@ -80,6 +80,16 @@ export function useWorkflowInstance(
     forceRender();
   }, []);
 
+  const deliverMessage = useCallback((name: string) => {
+    instanceRef.current?.deliverMessage(name);
+    forceRender();
+  }, []);
+
+  const broadcastSignal = useCallback((name: string) => {
+    instanceRef.current?.broadcastSignal(name);
+    forceRender();
+  }, []);
+
   const reset = useCallback(() => {
     instanceRef.current = null;
     clock.reset();
@@ -92,6 +102,8 @@ export function useWorkflowInstance(
     submit,
     completeTask,
     fireTimer,
+    deliverMessage,
+    broadcastSignal,
     reset,
   };
 }

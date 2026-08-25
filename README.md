@@ -25,6 +25,7 @@ React/Vite web UI with a full in-app Docs page — what/why/roadmap.
 | **Expense Reimbursement** | A business rule task that decides whether a human is needed at all — small claims skip Finance entirely |
 | **Employee Onboarding** | A three-way parallel split (IT, accounts, buddy) that the join holds until every track lands |
 | **Employee Offboarding** | An inclusive (OR) split where the form decides which tracks run — and a join that closes on however many actually did |
+| **Vendor Purchase Order** | Three catch events racing — vendor confirmation (message), a 5-day deadline (timer), a budget freeze (signal) — each ending in a terminate event that discards the losing branches |
 | **Deadlock Demo** | Deliberately broken: an AND-join downstream of an XOR-split. The validator predicts the hang, then the engine hangs exactly there |
 
 ### Leave Request, in detail
@@ -48,10 +49,11 @@ React/Vite web UI with a full in-app Docs page — what/why/roadmap.
                                                     (End: Approved)
 ```
 
-Elements understood by the engine: Start/End Events, User Tasks, Service
-Tasks, Business Rule Tasks, Exclusive (Decision) Gateways, Inclusive (OR)
-Gateways, Parallel (AND) Gateways — the last two as both split and join — and
-boundary Timer Events.
+Elements understood by the engine: Start/End Events, Terminate End Events, User
+Tasks, Service Tasks, Business Rule Tasks, Exclusive (Decision) Gateways,
+Inclusive (OR) Gateways, Parallel (AND) Gateways — the last two as both split
+and join — boundary Timer Events, and Intermediate Catch Events for timers,
+messages and signals.
 
 The inclusive join is the interesting one: an OR-split decides at runtime how
 many branches to activate, so the join can't count to a fixed number. It waits
@@ -102,9 +104,9 @@ full roadmap — that content isn't duplicated here.
 ## Next steps (not built yet)
 
 See the Roadmap section on the in-app Docs page. Short version: more BPMN
-element types (message/signal events, intermediate catch events, sub-processes,
-terminate end events), and eventually diagram authoring plus a real BPMN engine
-(Camunda/Zeebe) behind the same interface.
+element types (sub-processes, event-based gateways, multi-instance activities),
+and eventually diagram authoring plus a real BPMN engine (Camunda/Zeebe) behind
+the same interface.
 
 Explicit non-goals, since this is a simulator: auth, a database, a dashboard
 of concurrent instances, notifications.

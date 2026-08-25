@@ -2,10 +2,12 @@ import { XMLParser } from "fast-xml-parser";
 import { parseCondition } from "./conditionExpression.js";
 import type {
   BusinessRuleTaskNode,
+  CatchTrigger,
   EndEventNode,
   ExclusiveGatewayNode,
   FormField,
   InclusiveGatewayNode,
+  IntermediateCatchEventNode,
   NodeId,
   ParallelGatewayNode,
   ServiceTaskNode,
@@ -32,6 +34,10 @@ import type {
 export type ShapeKind =
   | "start"
   | "end"
+  | "endTerminate"
+  | "catchTimer"
+  | "catchMessage"
+  | "catchSignal"
   | "userTask"
   | "serviceTask"
   | "businessRuleTask"
@@ -324,6 +330,19 @@ function readNodes(
     add(node);
   }
 
+  for (const raw of toArray<XmlNode>(process.intermediateCatchEvent)) {
+    const id = attr(raw, "id");
+    if (!id) throw new BpmnParseError("<bpmn:intermediateCatchEvent> is missing an id");
+    const node: IntermediateCatchEventNode = {
+      id,
+      type: "intermediateCatchEvent",
+      name: attr(raw, "name") ?? id,
+      next: singleTarget(id, "Intermediate catch event", flows),
+      trigger: readCatchTrigger(raw, id),
+    };
+    add(node);
+  }
+
   for (const raw of toArray<XmlNode>(process.endEvent)) {
     const id = attr(raw, "id");
     if (!id) throw new BpmnParseError("<bpmn:endEvent> is missing an id");
@@ -332,6 +351,7 @@ function readNodes(
       type: "endEvent",
       name: attr(raw, "name") ?? id,
       outcome: attr(raw, "outcome") ?? id,
+      ...(raw.terminateEventDefinition !== undefined ? { terminate: true } : {}),
     };
     add(node);
   }
@@ -455,6 +475,35 @@ function readGateway(
   };
 }
 
+/** What an intermediate catch event is waiting for. */
+function readCatchTrigger(raw: XmlNode, id: NodeId): CatchTrigger {
+  if (raw.timerEventDefinition) {
+    const duration = text(raw.timerEventDefinition.timeDuration);
+    if (!duration) {
+      throw new BpmnParseError(`Timer event "${id}" is missing a <bpmn:timeDuration>`);
+    }
+    return { kind: "timer", durationMs: parseIsoDuration(duration) };
+  }
+
+  // messageRef / signalRef point at a top-level <bpmn:message> or
+  // <bpmn:signal>; this reads the ref itself, which is enough to match on.
+  if (raw.messageEventDefinition) {
+    const name = attr(raw.messageEventDefinition, "messageRef") ?? attr(raw, "name");
+    if (!name) throw new BpmnParseError(`Message event "${id}" needs a messageRef`);
+    return { kind: "message", name };
+  }
+
+  if (raw.signalEventDefinition) {
+    const name = attr(raw.signalEventDefinition, "signalRef") ?? attr(raw, "name");
+    if (!name) throw new BpmnParseError(`Signal event "${id}" needs a signalRef`);
+    return { kind: "signal", name };
+  }
+
+  throw new BpmnParseError(
+    `Intermediate catch event "${id}" has no timer, message or signal definition — only those three are supported`
+  );
+}
+
 function readInclusiveGateway(
   raw: XmlNode,
   id: NodeId,
@@ -547,6 +596,7 @@ function assertTargetsResolve(nodes: Record<NodeId, WorkflowNode>): void {
       case "startEvent":
       case "serviceTask":
       case "businessRuleTask":
+      case "intermediateCatchEvent":
         targets.push(node.next);
         break;
       case "userTask":
@@ -676,7 +726,10 @@ function shapeKindFor(id: NodeId, nodes: Record<NodeId, WorkflowNode>): ShapeKin
     case "startEvent":
       return "start";
     case "endEvent":
-      return "end";
+      return node.terminate ? "endTerminate" : "end";
+    case "intermediateCatchEvent":
+      if (node.trigger.kind === "timer") return "catchTimer";
+      return node.trigger.kind === "message" ? "catchMessage" : "catchSignal";
     default:
       return node.type;
   }

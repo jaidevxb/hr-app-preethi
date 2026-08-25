@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { ActionPanel } from "../components/ActionPanel.js";
 import { ClockPanel } from "../components/ClockPanel.js";
+import { EventPanel } from "../components/EventPanel.js";
 import { LogTimeline } from "../components/LogTimeline.js";
 import { ProcessDiagram } from "../components/ProcessDiagram.js";
 import { ReplayPanel } from "../components/ReplayPanel.js";
@@ -26,16 +27,22 @@ export function WorkflowPage() {
   const process = findProcess(processId);
   const { definition } = process;
 
-  const { instance, elapsedSimMs, submit, completeTask, fireTimer, reset } = useWorkflowInstance(
-    definition,
-    handlers,
-    speedId
-  );
+  const {
+    instance,
+    elapsedSimMs,
+    submit,
+    completeTask,
+    fireTimer,
+    deliverMessage,
+    broadcastSignal,
+    reset,
+  } = useWorkflowInstance(definition, handlers, speedId);
 
   const status = instance?.getStatus();
   const context = instance?.getContext() ?? {};
   const activeTasks = instance?.getActiveTasks() ?? [];
   const armedTimers = instance?.getArmedTimers() ?? [];
+  const pendingEvents = instance?.getPendingEvents() ?? [];
   const outcome = status === "completed" ? instance?.getEndEvents()[0] : undefined;
   const start = definition.nodes[definition.startNodeId] as StartEventNode;
 
@@ -56,12 +63,13 @@ export function WorkflowPage() {
     setReplaying(false);
   };
 
-  // Tokens are live but none are actionable and nothing is counting down.
+  // Tokens are live but none are actionable and nothing can wake them.
   const stuck =
     status === "waiting" &&
     instance !== null &&
     activeTasks.length === 0 &&
     armedTimers.length === 0 &&
+    pendingEvents.length === 0 &&
     instance.getTokens().length > 0;
 
   return (
@@ -143,6 +151,14 @@ export function WorkflowPage() {
           elapsedSimMs={elapsedSimMs}
           armedTimers={armedTimers}
           running={clockRunning}
+        />
+      )}
+
+      {pendingEvents.length > 0 && !inReplay && (
+        <EventPanel
+          events={pendingEvents}
+          onDeliverMessage={deliverMessage}
+          onBroadcastSignal={broadcastSignal}
         />
       )}
 

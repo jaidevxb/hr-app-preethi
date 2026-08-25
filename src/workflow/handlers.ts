@@ -38,6 +38,11 @@ export const handlers: ServiceHandlers = {
     message: `Queued ₹${Number(ctx.amount) || 0} for the next payroll run`,
   }),
 
+  "po.send": (ctx) => ({
+    context: { poSentTo: String(ctx.vendor ?? "the vendor") },
+    message: `PO for ₹${Number(ctx.amount) || 0} emailed to ${String(ctx.vendor ?? "the vendor")}`,
+  }),
+
   "offboarding.revokeAccess": (ctx) => ({
     context: { accessRevokedFor: String(ctx.employeeName ?? "the leaver") },
     message: `Revoked SSO, email and repo access for ${String(ctx.employeeName ?? "the leaver")}`,

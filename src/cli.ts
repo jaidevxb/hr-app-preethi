@@ -2,6 +2,7 @@ import { createInterface } from "node:readline";
 import { WorkflowInstance } from "./workflow/engine.js";
 import { handlers } from "./workflow/handlers.js";
 import { loadProcessLibrary } from "./workflow/loadProcessLibrary.node.js";
+import { formatDuration } from "./workflow/simulationClock.js";
 import { validateProcess } from "./workflow/validate.js";
 import type { FormField, StartEventNode, WorkflowContext } from "./workflow/types.js";
 
@@ -45,6 +46,50 @@ async function askField(field: FormField): Promise<unknown> {
   return field.type === "long" ? Number(answer) || 0 : answer || "—";
 }
 
+/**
+ * Nothing is waiting on a person: the process is parked on message, signal or
+ * timer events. Offer them as choices. Returns false when there's nothing at
+ * all to do, which means the instance is stuck.
+ */
+async function handleWaitingState(
+  instance: WorkflowInstance,
+  setClock: (ms: number) => void
+): Promise<boolean> {
+  const events = instance.getPendingEvents();
+  const timers = instance.getArmedTimers();
+  if (events.length === 0 && timers.length === 0) return false;
+
+  console.log("\n>> Nothing for a person to do — the process is waiting on events.");
+
+  const choices: Array<{ label: string; run: () => void }> = [];
+  for (const event of events) {
+    choices.push({
+      label:
+        event.kind === "message"
+          ? `Deliver message "${event.name}" (${event.nodeName})`
+          : `Broadcast signal "${event.name}" (${event.nodeName})`,
+      run: () =>
+        event.kind === "message"
+          ? void instance.deliverMessage(event.name)
+          : void instance.broadcastSignal(event.name),
+    });
+  }
+  for (const timer of timers) {
+    choices.push({
+      label: `Wait out "${timer.nodeName}" (${formatDuration(timer.remainingMs)} left)`,
+      run: () => {
+        setClock(timer.dueAt);
+        instance.tick();
+      },
+    });
+  }
+
+  choices.forEach((choice, i) => console.log(`  ${i + 1}) ${choice.label}`));
+  const answer = (await ask(`Pick one [1-${choices.length}]: `)).trim();
+  (choices[Number(answer) - 1] ?? choices[0]).run();
+  return true;
+}
+
 async function pickProcess() {
   if (library.length === 1) return library[0];
 
@@ -76,14 +121,21 @@ async function main() {
     initialContext[field.id] = await askField(field);
   }
 
-  const instance = new WorkflowInstance(definition, initialContext, handlers);
+  // The CLI has no ticking clock, so simulated time only moves when the user
+  // chooses to wait out a timer.
+  let simTime = 0;
+  const instance = new WorkflowInstance(definition, initialContext, handlers, () => simTime);
   instance.start();
 
   while (instance.getStatus() === "waiting") {
     const tasks = instance.getActiveTasks();
+
     if (tasks.length === 0) {
-      // Tokens remain but none are on a user task — a join is still waiting on
-      // a branch that can't arrive. Nothing a person can do about it here.
+      const advanced = await handleWaitingState(instance, (ms) => (simTime = ms));
+      if (advanced) continue;
+
+      // Nothing for a person to do, no event to send, no timer to run out — a
+      // join is waiting on a branch that can never arrive.
       console.log("\n!! Deadlocked: tokens are parked at a join that will never complete.");
       break;
     }

@@ -529,6 +529,18 @@ form > .btn-block {
   stroke-width: 1.6;
 }
 
+/* Filled disc inside a terminate end event */
+.diagram-terminate {
+  fill: var(--text);
+  stroke: none;
+  transition: fill 0.2s ease;
+}
+
+.diagram-node--visited .diagram-terminate,
+.diagram-node--current .diagram-terminate {
+  fill: var(--accent);
+}
+
 /* Task-type icons (person / gear / table) in the top-left of a task shape.
    Kept separate from .diagram-glyph so the "current" state doesn't thicken
    them into blobs at this size. */
@@ -645,6 +657,48 @@ form > .btn-block {
 .replay-controls .btn:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+}
+
+/* Message / signal events waiting on the outside world */
+.event-intro {
+  margin: 0.35rem 0 0.9rem;
+  font-size: 0.82rem;
+}
+
+.event-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.event-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--field-bg);
+  font-size: 0.84rem;
+}
+
+.event-node {
+  font-weight: 600;
+}
+
+.event-name {
+  font-size: 0.76rem;
+  color: var(--muted);
+}
+
+.event-row .btn-small {
+  margin-left: auto;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.78rem;
 }
 
 /* Validation panel */

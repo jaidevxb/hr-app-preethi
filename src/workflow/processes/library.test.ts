@@ -20,6 +20,7 @@ describe("process library", () => {
       "Employee Onboarding",
       "Expense Reimbursement",
       "Leave Request Approval",
+      "Vendor Purchase Order",
     ]);
   });
 
@@ -62,6 +63,94 @@ describe("Expense Reimbursement", () => {
     wf.completeTask(wf.getActiveTasks()[0].tokenId, { decision: "rejected" });
 
     expect(wf.getEndEvents().map((end) => end.id)).toEqual(["endRejected"]);
+  });
+});
+
+describe("Vendor Purchase Order — catch events racing to terminate", () => {
+  const DAY = 24 * 60 * 60 * 1000;
+
+  /** The PO process on a clock the test controls. */
+  function raise() {
+    let simTime = 0;
+    const wf = new WorkflowInstance(
+      findProcess("Process_VendorPurchaseOrder").definition,
+      { vendor: "Nandi Supplies", amount: 40000 },
+      handlers,
+      () => simTime
+    );
+    wf.start();
+    return { wf, set: (ms: number) => (simTime = ms) };
+  }
+
+  it("parks all three branches on their events after sending the PO", () => {
+    const { wf } = raise();
+
+    expect(messages(wf)).toContain("PO for ₹40000 emailed to Nandi Supplies");
+    expect(wf.getActiveTasks()).toEqual([]); // nothing for a human yet
+
+    expect(wf.getPendingEvents().map((event) => [event.kind, event.name])).toEqual([
+      ["message", "VendorConfirmed"],
+      ["signal", "BudgetPulled"],
+    ]);
+    // The third branch is on a timer, not an external event.
+    expect(wf.getArmedTimers().map((timer) => timer.nodeId)).toEqual(["catchTimeout"]);
+  });
+
+  it("lets the vendor confirm, then terminates the losing branches", () => {
+    const { wf } = raise();
+
+    expect(wf.deliverMessage("VendorConfirmed")).toBe(true);
+    expect(messages(wf)).toContain('Message "VendorConfirmed" received');
+
+    const receive = wf.getActiveTasks()[0];
+    expect(receive.node.id).toBe("receiveGoods");
+    wf.completeTask(receive.tokenId, {});
+
+    expect(wf.getStatus()).toBe("completed");
+    expect(wf.getEndEvents().map((end) => end.id)).toEqual(["endFulfilled"]);
+    // The timeout and budget branches were still parked; terminate killed them.
+    expect(messages(wf)).toContain("Terminated — discarded 2 token(s) still in flight");
+    expect(wf.getTokens()).toEqual([]);
+    expect(wf.getPendingEvents()).toEqual([]);
+  });
+
+  it("cancels the order when the deadline passes first", () => {
+    const { wf, set } = raise();
+
+    set(4 * DAY);
+    expect(wf.tick()).toEqual([]);
+
+    set(5 * DAY);
+    expect(wf.tick()).toHaveLength(1);
+
+    expect(wf.getStatus()).toBe("completed");
+    expect(wf.getEndEvents().map((end) => end.id)).toEqual(["endCancelled"]);
+    expect(messages(wf)).toContain("Terminated — discarded 2 token(s) still in flight");
+  });
+
+  it("cancels when Finance broadcasts the budget freeze", () => {
+    const { wf } = raise();
+
+    expect(wf.broadcastSignal("BudgetPulled")).toBe(1);
+    expect(wf.getStatus()).toBe("completed");
+    expect(wf.getEndEvents().map((end) => end.outcome)).toEqual(["cancelled"]);
+  });
+
+  it("ignores messages and signals nobody is waiting for", () => {
+    const { wf } = raise();
+
+    expect(wf.deliverMessage("SomethingElse")).toBe(false);
+    expect(wf.broadcastSignal("SomethingElse")).toBe(0);
+    expect(wf.getStatus()).toBe("waiting");
+  });
+
+  it("only wakes one token per message, unlike a signal", () => {
+    const { wf } = raise();
+
+    // The message had exactly one listener; delivering again finds nobody,
+    // because that branch has moved on to the Receive Goods task.
+    expect(wf.deliverMessage("VendorConfirmed")).toBe(true);
+    expect(wf.deliverMessage("VendorConfirmed")).toBe(false);
   });
 });
 

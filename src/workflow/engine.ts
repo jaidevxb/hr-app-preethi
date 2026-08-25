@@ -37,15 +37,27 @@ export interface ServiceTaskResult {
 export type ServiceHandler = (ctx: WorkflowContext) => ServiceTaskResult | void;
 export type ServiceHandlers = Record<string, ServiceHandler>;
 
-/** A boundary timer counting down on a task the process is currently waiting at. */
+/** A timer counting down somewhere the process is currently waiting. */
 export interface ArmedTimer {
   tokenId: string;
   nodeId: NodeId;
   nodeName: string;
   label?: string;
+  /** A task's SLA, or an intermediate event the flow is waiting out. */
+  kind: "boundary" | "intermediate";
   /** Deadline, on whatever clock the instance was given. */
   dueAt: number;
   remainingMs: number;
+}
+
+/** A token parked on an intermediate event, waiting to be woken from outside. */
+export interface PendingEvent {
+  tokenId: string;
+  nodeId: NodeId;
+  nodeName: string;
+  kind: "message" | "signal";
+  /** The message or signal name this token is listening for. */
+  name: string;
 }
 
 /** Runaway guard: a cyclic definition with no user task would spin forever. */
@@ -126,7 +138,7 @@ export class WorkflowInstance {
     return [...this.reachedEnds];
   }
 
-  /** Boundary timers currently counting down, with time left on the clock. */
+  /** Timers currently counting down, with time left on the clock. */
   getArmedTimers(): ArmedTimer[] {
     const now = this.now();
     const armed: ArmedTimer[] = [];
@@ -135,23 +147,85 @@ export class WorkflowInstance {
       const token = this.tokens.find((candidate) => candidate.id === tokenId);
       if (!token) continue;
       const node = this.node(token.nodeId);
-      if (node.type !== "userTask" || !node.timer) continue;
 
-      armed.push({
+      const common = {
         tokenId,
         nodeId: node.id,
         nodeName: node.name,
-        label: node.timer.label,
         dueAt,
         remainingMs: Math.max(0, dueAt - now),
-      });
+      };
+
+      if (node.type === "userTask" && node.timer) {
+        armed.push({ ...common, kind: "boundary", label: node.timer.label });
+      } else if (node.type === "intermediateCatchEvent" && node.trigger.kind === "timer") {
+        armed.push({ ...common, kind: "intermediate", label: node.name });
+      }
     }
     return armed;
   }
 
+  /** Tokens parked on a message or signal event, waiting to be woken. */
+  getPendingEvents(): PendingEvent[] {
+    const pending: PendingEvent[] = [];
+
+    for (const token of this.tokens) {
+      const node = this.node(token.nodeId);
+      if (node.type !== "intermediateCatchEvent") continue;
+      if (node.trigger.kind === "timer") continue;
+
+      pending.push({
+        tokenId: token.id,
+        nodeId: node.id,
+        nodeName: node.name,
+        kind: node.trigger.kind,
+        name: node.trigger.name,
+      });
+    }
+    return pending;
+  }
+
   /**
-   * Fire every boundary timer whose deadline has passed. Returns the tokens
-   * that escalated, so a caller driving a clock knows whether anything moved.
+   * Deliver a message to this instance. A message has one recipient, so this
+   * wakes the first token waiting for that name. Returns whether one was.
+   */
+  deliverMessage(name: string): boolean {
+    const waiting = this.getPendingEvents().find(
+      (event) => event.kind === "message" && event.name === name
+    );
+    if (!waiting) return false;
+
+    this.wake(waiting.tokenId, `Message "${name}" received`);
+    this.run();
+    return true;
+  }
+
+  /**
+   * Broadcast a signal. Unlike a message this reaches everyone: every token
+   * listening for that name continues. Returns how many were woken.
+   */
+  broadcastSignal(name: string): number {
+    const waiting = this.getPendingEvents().filter(
+      (event) => event.kind === "signal" && event.name === name
+    );
+    for (const event of waiting) this.wake(event.tokenId, `Signal "${name}" received`);
+    if (waiting.length > 0) this.run();
+    return waiting.length;
+  }
+
+  private wake(tokenId: string, message: string): void {
+    const token = this.tokens.find((candidate) => candidate.id === tokenId);
+    if (!token) return;
+    const node = this.node(token.nodeId);
+    if (node.type !== "intermediateCatchEvent") return;
+
+    this.record(node, message, token);
+    this.moveToken(token, node.next);
+  }
+
+  /**
+   * Fire every timer whose deadline has passed. Returns the tokens that moved,
+   * so a caller driving a clock knows whether anything happened.
    */
   tick(): string[] {
     const now = this.now();
@@ -163,10 +237,32 @@ export class WorkflowInstance {
     for (const tokenId of due) {
       // Firing one runs the engine, which can consume or re-arm others.
       if (!this.timers.has(tokenId)) continue;
-      this.fireTimer(tokenId);
-      fired.push(tokenId);
+      if (this.fireDueTimer(tokenId)) fired.push(tokenId);
     }
     return fired;
+  }
+
+  /** A timer came due: escalate a task, or release an intermediate wait. */
+  private fireDueTimer(tokenId: string): boolean {
+    const token = this.tokens.find((candidate) => candidate.id === tokenId);
+    if (!token) return false;
+    const node = this.node(token.nodeId);
+
+    if (node.type === "userTask" && node.timer) {
+      this.fireTimer(tokenId);
+      return true;
+    }
+
+    if (node.type === "intermediateCatchEvent" && node.trigger.kind === "timer") {
+      this.timers.delete(tokenId);
+      this.record(node, "Wait elapsed, continuing", token);
+      this.moveToken(token, node.next);
+      this.run();
+      return true;
+    }
+
+    this.timers.delete(tokenId);
+    return false;
   }
 
   /** Begin execution: place a token on the start event and run until blocked. */
@@ -262,6 +358,17 @@ export class WorkflowInstance {
       return;
     }
 
+    if (node.type === "intermediateCatchEvent") {
+      // The token parks here until its trigger arrives.
+      if (node.trigger.kind === "timer") {
+        this.timers.set(token.id, this.now() + node.trigger.durationMs);
+        this.record(node, "Waiting for the timer to elapse", token);
+      } else {
+        this.record(node, `Waiting for ${node.trigger.kind} "${node.trigger.name}"`, token);
+      }
+      return;
+    }
+
     if (node.type === "exclusiveGateway") {
       const branch = node.branches.find((candidate) => candidate.condition(this.context));
       const next = branch?.next ?? node.default;
@@ -288,6 +395,17 @@ export class WorkflowInstance {
     this.record(node, `Workflow ended: ${node.outcome}`, token);
     this.reachedEnds.push(node);
     this.consume(token);
+
+    if (node.terminate) {
+      // A terminate end event ends the whole instance, not just this path:
+      // everything still in flight is discarded where it stands.
+      const discarded = this.tokens.length;
+      if (discarded > 0) {
+        this.record(node, `Terminated — discarded ${discarded} token(s) still in flight`, token);
+      }
+      for (const other of [...this.tokens]) this.consume(other);
+      this.queue.length = 0;
+    }
   }
 
   private stepInclusiveGateway(node: InclusiveGatewayNode, token: Token): void {

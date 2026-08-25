@@ -6,6 +6,7 @@ export function outgoingTargets(node: WorkflowNode): NodeId[] {
     case "startEvent":
     case "serviceTask":
     case "businessRuleTask":
+    case "intermediateCatchEvent":
       return [node.next];
     case "userTask":
       return node.timer ? [node.next, node.timer.next] : [node.next];

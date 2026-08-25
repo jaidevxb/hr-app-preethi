@@ -46,10 +46,24 @@ const GLOSSARY = [
     here: "Attached to “Manager Review” — 3-day SLA, escalates to a skip-level manager",
   },
   {
+    icon: "◉",
+    name: "Intermediate Catch Event",
+    meaning:
+      "The flow stops and waits for something: a duration to elapse, a message addressed to this instance, or a broadcast signal. A message wakes one waiting token; a signal wakes every token listening for it.",
+    here: "The purchase order waits on all three at once — vendor confirmation, a 5-day deadline, and a budget-freeze signal",
+  },
+  {
     icon: "●",
     name: "End Event",
     meaning: "Marks where a process instance finishes.",
     here: '"Leave Approved" / "Leave Rejected"',
+  },
+  {
+    icon: "◍",
+    name: "Terminate End Event",
+    meaning:
+      "Ends the whole instance rather than just its own path — every other token still in flight is discarded where it stands.",
+    here: "Each outcome of the purchase order terminates, so the first branch to finish cancels the other two",
   },
 ];
 
@@ -100,6 +114,11 @@ const SHIPPED = [
       "An OR-split takes every branch whose condition holds, so how many branches are running is only known at runtime — which means the join can't count to a fixed number the way a parallel join does. It waits until no live token anywhere else in the process could still reach it, then merges however many turned up. Offboarding shows it: revoking access always runs, the laptop and parking tracks are conditional, and the join closes on one, two or three branches depending on the form.",
   },
   {
+    title: "Events, and the race they make possible",
+    detail:
+      "Intermediate catch events park a token until something reaches it — an elapsed duration, a message aimed at this instance, or a broadcast signal (messages wake one listener, signals wake all of them). Pair that with terminate end events, which end the whole instance rather than just their own path, and you get the event race: the vendor purchase order waits on confirmation, a 5-day deadline and a budget freeze simultaneously, and whichever arrives first discards the other two branches where they stand. In a real deployment the message and signal come from an API or a broker; here they're buttons.",
+  },
+  {
     title: "Step-through replay",
     detail:
       "Any instance can be replayed from its log — play it through, scrub to a step, or walk it one entry at a time while the diagram highlights exactly the element that entry touched. With parallel branches the log interleaves two tokens, and stepping through it is the clearest way to see that they really did run at the same time.",
@@ -120,7 +139,7 @@ const ROADMAP = [
   {
     title: "More of the BPMN vocabulary",
     detail:
-      "Message and signal events, intermediate catch events, sub-processes, terminate end events. Each one is a new element in the glossary and a new behaviour in the engine — which is the whole point of the exercise.",
+      "Sub-processes (collapsed and expanded), event-based gateways, multi-instance activities, non-interrupting boundary events. Each one is a new element in the glossary and a new behaviour in the engine — which is the whole point of the exercise.",
   },
   {
     title: "Diagram authoring, not just viewing",
@@ -266,7 +285,7 @@ export function DocsPage() {
         <h2>Current scope — v1</h2>
         <ul>
           <li>
-            Five processes in the library — four that work and one deliberately broken; adding another is adding a
+            Six processes in the library — five that work and one deliberately broken; adding another is adding a
             .bpmn file to the folder
           </li>
           <li>One in-memory instance at a time — nothing persists across a page refresh or a new CLI run</li>
@@ -279,9 +298,10 @@ export function DocsPage() {
             the instance just sits there, which is what a real engine does too
           </li>
           <li>
-            Nine BPMN element types are understood (start, user task, service task, business rule task, exclusive
-            gateway, inclusive gateway, parallel gateway, boundary timer, end); anything else in a file is rejected
-            rather than silently ignored
+            Eleven BPMN element types are understood (start, user task, service task, business rule task, exclusive
+            gateway, inclusive gateway, parallel gateway, boundary timer, intermediate catch —
+            timer/message/signal, end, terminate end); anything else in a file is rejected rather than silently
+            ignored
           </li>
           <li>The diagram is read-only — a renderer for this subset, not a general-purpose one</li>
           <li>The request form's fields are hardcoded, not read from the process</li>

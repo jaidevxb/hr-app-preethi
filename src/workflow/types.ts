@@ -44,6 +44,28 @@ export interface StartEventNode extends BaseNode {
 export interface EndEventNode extends BaseNode {
   type: "endEvent";
   outcome: string;
+  /**
+   * A Terminate End Event doesn't just end its own path — it ends the whole
+   * instance, discarding every other token still in flight.
+   */
+  terminate?: boolean;
+}
+
+/**
+ * BPMN: Intermediate Catch Event. The token stops here and waits for
+ * something: an elapsed duration, a message addressed to this instance, or a
+ * broadcast signal. Messages wake one waiting token; signals wake every token
+ * listening for them.
+ */
+export type CatchTrigger =
+  | { kind: "timer"; durationMs: number }
+  | { kind: "message"; name: string }
+  | { kind: "signal"; name: string };
+
+export interface IntermediateCatchEventNode extends BaseNode {
+  type: "intermediateCatchEvent";
+  next: NodeId;
+  trigger: CatchTrigger;
 }
 
 // BPMN: User Task, optionally with an attached Boundary Timer Event
@@ -124,6 +146,7 @@ export type WorkflowNode =
   | UserTaskNode
   | ServiceTaskNode
   | BusinessRuleTaskNode
+  | IntermediateCatchEventNode
   | ExclusiveGatewayNode
   | InclusiveGatewayNode
   | ParallelGatewayNode;
